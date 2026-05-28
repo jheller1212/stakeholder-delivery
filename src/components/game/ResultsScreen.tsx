@@ -91,12 +91,21 @@ export default function ResultsScreen({ state, onLeave }: Props) {
               </div>
 
               <details className="mt-2">
-                <summary className="text-[10px] text-gray-600 cursor-pointer hover:text-gray-400">Breakdown</summary>
+                <summary className="text-[10px] text-gray-600 cursor-pointer hover:text-gray-400">Score Breakdown</summary>
                 <ul className="mt-1 space-y-0.5 text-[10px] text-gray-500">
                   {score.breakdown.map((line, i) => (
                     <li key={i}>{line}</li>
                   ))}
                 </ul>
+              </details>
+
+              <details className="mt-1">
+                <summary className="text-[10px] text-gray-600 cursor-pointer hover:text-gray-400">Economic Explanation</summary>
+                <div className="mt-1 space-y-1.5">
+                  {score.explanations.map((text, i) => (
+                    <p key={i} className="text-[10px] text-gray-500 leading-relaxed">{text}</p>
+                  ))}
+                </div>
               </details>
             </div>
           )

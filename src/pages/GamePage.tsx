@@ -5,6 +5,7 @@ import { useGame, useCurrentPlayer, useIsMyTurn, useAvailableCharacters } from '
 import {
   selectCharacter, drawCard, putBackCard, buyAsset, issueLiability, endTurn,
   fireCharacter, divestAsset, swapHands, swapWithDeck, terminateCredit, payBanker, redeemLiability,
+  useMinusIntoPlus, useSilverIntoGold, useChangeAssetColor, confirmAssetAbilities,
 } from '../lib/gameService'
 import { processBotTurn, registerBot } from '../lib/botController'
 import { isBotPlayer } from '../lib/botEngine'
@@ -17,6 +18,7 @@ import PlayerSeats from '../components/game/PlayerSeats'
 import MarketBar from '../components/game/MarketBar'
 import CardTray from '../components/game/CardTray'
 import StatsPanel from '../components/game/StatsPanel'
+import AssetAbilities from '../components/game/AssetAbilities'
 import type { Character } from '../types/game'
 
 const CHARACTER_PORTRAITS: Partial<Record<Character, string>> = {
@@ -198,7 +200,19 @@ export default function GamePage() {
             state={state}
             player={currentPlayer}
             isBankerTarget={isBankerTarget}
-            onPayBanker={(assets, liabilities) => payBanker(gameId!, user!.uid, assets, liabilities).catch(handleError)}
+            onPayBanker={(assets, liabilities, issueLiabilityIdx) => payBanker(gameId!, user!.uid, assets, liabilities, issueLiabilityIdx).catch(handleError)}
+          />
+        )}
+
+        {state.phase === 'asset_abilities' && (
+          <AssetAbilities
+            state={state}
+            player={currentPlayer}
+            isMyTurn={isMyTurn}
+            onMinusIntoPlus={(assetIdx, color) => useMinusIntoPlus(gameId!, user!.uid, assetIdx, color).catch(handleError)}
+            onSilverIntoGold={(purpleIdx, targetIdx) => useSilverIntoGold(gameId!, user!.uid, purpleIdx, targetIdx).catch(handleError)}
+            onChangeAssetColor={(purpleIdx, targetIdx, color) => useChangeAssetColor(gameId!, user!.uid, purpleIdx, targetIdx, color).catch(handleError)}
+            onConfirm={() => confirmAssetAbilities(gameId!, user!.uid).catch(handleError)}
           />
         )}
 

@@ -5,12 +5,13 @@ interface Props {
   state: GameState
   player: Player
   isBankerTarget: boolean
-  onPayBanker: (assetIndices: number[], liabilityIndices: number[]) => void
+  onPayBanker: (assetIndices: number[], liabilityIndices: number[], issueLiabilityIndex?: number) => void
 }
 
 export default function BankerTarget({ state, player, isBankerTarget, onPayBanker }: Props) {
   const [selectedAssets, setSelectedAssets] = useState<number[]>([])
   const [selectedLiabilities, setSelectedLiabilities] = useState<number[]>([])
+  const [selectedHandLiability, setSelectedHandLiability] = useState<number | null>(null)
 
   if (!isBankerTarget) {
     return (
@@ -30,6 +31,11 @@ export default function BankerTarget({ state, player, isBankerTarget, onPayBanke
 
   const toggleAsset = (i: number) => setSelectedAssets(prev => prev.includes(i) ? prev.filter(x => x !== i) : [...prev, i])
   const toggleLiability = (i: number) => setSelectedLiabilities(prev => prev.includes(i) ? prev.filter(x => x !== i) : [...prev, i])
+
+  const isCFO = player.character === 'cfo'
+  const handLiabilities = player.hand
+    .map((card, i) => ({ card, i }))
+    .filter(({ card }) => 'rfr_type' in card)
 
   return (
     <div className="w-full max-w-lg mx-auto space-y-5">
@@ -91,10 +97,31 @@ export default function BankerTarget({ state, player, isBankerTarget, onPayBanke
         </div>
       )}
 
+      {isCFO && handLiabilities.length > 0 && (
+        <div>
+          <p className="text-[10px] text-gray-500 uppercase mb-2">CFO: Issue a Liability to raise cash</p>
+          <div className="flex flex-wrap gap-2">
+            {handLiabilities.map(({ card, i }) => (
+              <button
+                key={i}
+                onClick={() => setSelectedHandLiability(selectedHandLiability === i ? null : i)}
+                className={`px-3 py-1.5 rounded-lg border text-xs ${
+                  selectedHandLiability === i
+                    ? 'border-blue-500 bg-blue-500/10 text-blue-300'
+                    : 'border-gray-700 bg-gray-800/50 text-gray-400 hover:border-gray-600'
+                }`}
+              >
+                Issue {(card as { rfr_type: string }).rfr_type.replace('_', ' ')} (+{(card as { gold: number }).gold} gold)
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="text-center">
         <button
-          onClick={() => onPayBanker(selectedAssets, selectedLiabilities)}
-          disabled={selectedAssets.length === 0 && selectedLiabilities.length === 0}
+          onClick={() => onPayBanker(selectedAssets, selectedLiabilities, selectedHandLiability ?? undefined)}
+          disabled={selectedAssets.length === 0 && selectedLiabilities.length === 0 && selectedHandLiability === null}
           className="px-6 py-2 bg-red-700/80 hover:bg-red-600 disabled:opacity-30 text-white font-semibold rounded-lg transition-colors text-sm"
         >
           Confirm Payment

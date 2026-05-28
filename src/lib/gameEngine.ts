@@ -114,7 +114,7 @@ export function createInitialGameState(
   const players: Player[] = playerData.map((p, i) => {
     // Each player starts with 1 gold, 2 unique assets, 2 liabilities
     const startingAssets = [assetDeck.pop()!, assetDeck.pop()!]
-    const startingHand: (Asset | Liability)[] = [liabilityDeck.pop()!, liabilityDeck.pop()!]
+    const startingLiabilities = [liabilityDeck.pop()!, liabilityDeck.pop()!]
 
     return {
       id: `player-${i}`,
@@ -122,12 +122,14 @@ export function createInitialGameState(
       name: p.name,
       character: null,
       cash: 1,
-      hand: startingHand,
+      hand: [],
       assets: startingAssets,
-      liabilities: [],
+      liabilities: startingLiabilities,
       has_used_ability: false,
       cards_drawn: [],
       total_cards_drawn: 0,
+      assets_bought_this_turn: 0,
+      liabilities_issued_this_turn: 0,
       is_connected: true,
     }
   })
@@ -211,15 +213,22 @@ export function calculateScore(player: Player, market: Market): {
   cashValue: number
   total: number
   breakdown: string[]
+  explanations: string[]
 } {
   const breakdown: string[] = []
+  const explanations: string[] = []
 
   // Asset values
   let assetValue = 0
   for (const asset of player.assets) {
     const value = assetMarketValue(asset, market)
+    const marketMod = market[asset.color]
+    const modStr = marketMod === 'plus' ? ' +1 market bonus' : marketMod === 'minus' ? ' -1 market penalty' : ''
     assetValue += value + asset.silver
-    breakdown.push(`${asset.color} asset: ${value}g + ${asset.silver}s = ${value + asset.silver}`)
+    breakdown.push(`${asset.color} asset: ${asset.gold} gold${asset.silver > 0 ? ` + ${asset.silver} silver` : ''}${modStr} = ${value + asset.silver}`)
+  }
+  if (player.assets.length > 0) {
+    explanations.push('Assets represent investments your company holds. Their value is their base gold value, adjusted by market conditions (+1 if the market is positive for that color, -1 if negative). Silver adds additional value.')
   }
 
   // Liability costs
@@ -229,19 +238,52 @@ export function calculateScore(player: Player, market: Market): {
       ? liability.gold + market.rfr
       : liability.gold + market.rfr + market.mrp
     liabilityValue += cost
-    breakdown.push(`${liability.rfr_type} liability: -${cost}`)
+    if (liability.rfr_type === 'short_term') {
+      breakdown.push(`Short-term liability: ${liability.gold} + RFR(${market.rfr}) = -${cost}`)
+    } else {
+      breakdown.push(`Long-term liability: ${liability.gold} + RFR(${market.rfr}) + MRP(${market.mrp}) = -${cost}`)
+    }
+  }
+  if (player.liabilities.length > 0) {
+    explanations.push('Liabilities are debts your company owes. Short-term debt costs the base amount plus the Risk-Free Rate (RFR). Long-term debt costs the base plus both RFR and the Market Risk Premium (MRP), reflecting the higher cost of long-term borrowing.')
   }
 
   const total = assetValue - liabilityValue + player.cash
   breakdown.push(`Cash: ${player.cash}`)
   breakdown.push(`Total: ${assetValue} - ${liabilityValue} + ${player.cash} = ${total}`)
 
-  return { assetValue, liabilityValue, cashValue: player.cash, total, breakdown }
+  explanations.push(`Your final score is: Total Asset Value (${assetValue}) minus Total Liability Cost (${liabilityValue}) plus Cash on hand (${player.cash}). This represents your company's net worth — how much value you created minus what you owe.`)
+
+  if (total > 0) {
+    explanations.push('A positive score means your company created more value through investments than it lost through debt — a healthy balance sheet.')
+  } else if (total < 0) {
+    explanations.push('A negative score means your company\'s debts exceeded the value of its assets and cash — this would mean insolvency in the real world.')
+  }
+
+  return { assetValue, liabilityValue, cashValue: player.cash, total, breakdown, explanations }
 }
 
 // CSO can only buy red or green
 export function canCSOBuyAsset(asset: Asset): boolean {
   return asset.color === 'red' || asset.color === 'green'
+}
+
+// Apply event effects to all players' assets
+export function applyEventEffects(players: Player[], event: GameEvent): Player[] {
+  return players.map(p => {
+    let assets = p.assets
+    if (event.plus_gold && event.plus_gold.length > 0) {
+      assets = assets.map(a =>
+        event.plus_gold!.includes(a.color) ? { ...a, gold: a.gold + 1 } : a
+      )
+    }
+    if (event.minus_gold && event.minus_gold.length > 0) {
+      assets = assets.map(a =>
+        event.minus_gold!.includes(a.color) ? { ...a, gold: Math.max(0, a.gold - 1) } : a
+      )
+    }
+    return assets !== p.assets ? { ...p, assets } : p
+  })
 }
 
 // Character bonus cash at start of turn

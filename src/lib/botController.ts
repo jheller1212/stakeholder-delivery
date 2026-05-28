@@ -2,7 +2,7 @@ import type { GameState } from '../types/game'
 import {
   selectCharacter, drawCard, putBackCard, buyAsset, issueLiability,
   endTurn, fireCharacter, divestAsset, swapHands, swapWithDeck,
-  terminateCredit, payBanker, redeemLiability,
+  terminateCredit, payBanker, redeemLiability, confirmAssetAbilities,
 } from './gameService'
 import {
   isBotPlayer,
@@ -65,6 +65,27 @@ export async function processBotTurn(gameId: string, state: GameState): Promise<
       } finally {
         pendingBots.delete(key)
       }
+    }
+    return
+  }
+
+  // Handle asset_abilities phase: bots auto-confirm (skip using abilities for simplicity)
+  if (state.phase === 'asset_abilities') {
+    if (state.current_player_index === null) return
+    const abilityPlayer = state.players[state.current_player_index]
+    if (!abilityPlayer || !isBotPlayer(abilityPlayer.user_id)) return
+
+    const key = `${abilityPlayer.user_id}-asset_abilities-${state.turn_number}`
+    if (pendingBots.has(key)) return
+    pendingBots.add(key)
+
+    try {
+      await sleep(ACTION_DELAY)
+      await confirmAssetAbilities(gameId, abilityPlayer.user_id)
+    } catch (err) {
+      console.warn(`Bot ${abilityPlayer.name} asset abilities confirm failed:`, err)
+    } finally {
+      pendingBots.delete(key)
     }
     return
   }
