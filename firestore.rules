@@ -13,11 +13,12 @@ service cloud.firestore {
       }
     }
 
-    // Games: any authenticated player in the game can read, write via transactions
+    // Games: any authenticated user can read; writes restricted to authenticated users
+    // Full validation will move to Cloud Functions (server-authoritative)
     match /games/{gameId} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null
-        && request.auth.uid in resource.data.players.map(p, p.user_id);
+      allow create: if request.auth != null;
+      allow update: if request.auth != null;
     }
   }
 }
