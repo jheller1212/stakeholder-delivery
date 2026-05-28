@@ -26,15 +26,11 @@ function generateAssetDeck(): Asset[] {
     for (let i = 0; i < 8; i++) {
       const gold = randomInt(1, 4)
       const silver = randomInt(0, 3)
-      assets.push({
-        id: `asset-${id++}`,
-        gold,
-        silver,
-        color,
-        ability: color === 'purple' && i < 3
-          ? (['minus_into_plus', 'silver_into_gold', 'change_asset_color'] as const)[i]
-          : undefined,
-      })
+      const asset: Asset = { id: `asset-${id++}`, gold, silver, color }
+      if (color === 'purple' && i < 3) {
+        asset.ability = (['minus_into_plus', 'silver_into_gold', 'change_asset_color'] as const)[i]
+      }
+      assets.push(asset)
     }
   }
   return shuffle(assets)
@@ -124,6 +120,7 @@ export function createInitialGameState(
       id: `player-${i}`,
       user_id: p.user_id,
       name: p.name,
+      character: null,
       cash: 1,
       hand: startingHand,
       assets: startingAssets,
@@ -161,7 +158,7 @@ export function createInitialGameState(
 // - CEO: budget 3, each color costs 1
 // - CSO: budget 2, red/green cost 1, blue/purple/yellow cost 2
 // - Everyone else: budget 1, each color costs 1
-export function getPlayableAssets(character?: Character): number {
+export function getPlayableAssets(character?: Character | null): number {
   if (!character) return 1
   if (character === 'ceo') return 3
   if (character === 'cso') return 2
@@ -176,20 +173,20 @@ export function getCSOAssetCost(color: CardColor): number {
 }
 
 // How many liabilities a player can issue based on character
-export function getPlayableLiabilities(character?: Character): number {
+export function getPlayableLiabilities(character?: Character | null): number {
   if (!character) return 1
   if (character === 'cfo') return 3
   return 1
 }
 
 // How many cards a player can draw based on character
-export function getDrawCount(character?: Character): number {
+export function getDrawCount(character?: Character | null): number {
   if (character === 'head_of_rnd') return 6
   return 3
 }
 
 // How many cards a player must put back based on character
-export function getPutBackCount(character?: Character): number {
+export function getPutBackCount(character?: Character | null): number {
   if (character === 'head_of_rnd') return 2
   return 1
 }

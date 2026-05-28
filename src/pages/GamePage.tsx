@@ -132,7 +132,7 @@ export default function GamePage() {
               availableCharacters={availableCharacters}
               state={state}
               isMyTurn={isMyTurn}
-              currentPlayerCharacter={currentPlayer.character}
+              currentPlayerCharacter={currentPlayer.character ?? undefined}
               onSelect={(character: Character) => {
                 selectCharacter(gameId!, user!.uid, character).catch(handleError)
               }}
