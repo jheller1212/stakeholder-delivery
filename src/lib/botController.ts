@@ -44,27 +44,29 @@ export function getBotDifficulty(userId: string): BotDifficulty | undefined {
 
 // Main entry: check if a bot needs to act, and execute
 export async function processBotTurn(gameId: string, state: GameState): Promise<void> {
-  // Character selection: all bots need to pick
+  // Character selection: bots pick in turn order, waiting for humans
   if (state.phase === 'character_selection') {
-    for (const player of state.players) {
-      if (!isBotPlayer(player.user_id)) continue
-      if (player.character) continue // Already selected
-      const difficulty = botDifficulties.get(player.user_id)
-      if (!difficulty) continue
+    // Find the first player who hasn't selected yet
+    const nextToSelect = state.players.find(p => !p.character)
+    if (!nextToSelect) return
+    // If it's a human's turn to select, wait for them
+    if (!isBotPlayer(nextToSelect.user_id)) return
 
-      const key = `${player.user_id}-charselect-${state.turn_number}`
-      if (pendingBots.has(key)) continue
-      pendingBots.add(key)
+    const difficulty = botDifficulties.get(nextToSelect.user_id)
+    if (!difficulty) return
 
-      try {
-        await sleep(ACTION_DELAY)
-        const character = botSelectCharacter(state, player, difficulty)
-        await selectCharacter(gameId, player.user_id, character)
-      } catch (err) {
-        console.warn(`Bot ${player.name} character select failed:`, err)
-      } finally {
-        pendingBots.delete(key)
-      }
+    const key = `${nextToSelect.user_id}-charselect-${state.turn_number}`
+    if (pendingBots.has(key)) return
+    pendingBots.add(key)
+
+    try {
+      await sleep(ACTION_DELAY)
+      const character = botSelectCharacter(state, nextToSelect, difficulty)
+      await selectCharacter(gameId, nextToSelect.user_id, character)
+    } catch (err) {
+      console.warn(`Bot ${nextToSelect.name} character select failed:`, err)
+    } finally {
+      pendingBots.delete(key)
     }
     return
   }
