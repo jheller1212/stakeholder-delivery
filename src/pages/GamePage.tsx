@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { useGame, useCurrentPlayer, useIsMyTurn, useAvailableCharacters } from '../hooks/useGame'
@@ -5,6 +6,8 @@ import {
   selectCharacter, drawCard, putBackCard, buyAsset, issueLiability, endTurn,
   fireCharacter, divestAsset, swapHands, swapWithDeck, terminateCredit, payBanker, redeemLiability,
 } from '../lib/gameService'
+import { processBotTurn, registerBot } from '../lib/botController'
+import { isBotPlayer } from '../lib/botEngine'
 import CharacterSelect from '../components/game/CharacterSelect'
 import DrawPhase from '../components/game/DrawPhase'
 import PlayPhase from '../components/game/PlayPhase'
@@ -21,6 +24,43 @@ export default function GamePage() {
   const currentPlayer = useCurrentPlayer(state, user?.uid)
   const isMyTurn = useIsMyTurn(state, user?.uid)
   const availableCharacters = useAvailableCharacters(state)
+
+  const botsInitialized = useRef(false)
+
+  // Initialize bots from localStorage (set by LobbyPage)
+  useEffect(() => {
+    if (!gameId || botsInitialized.current) return
+    botsInitialized.current = true
+
+    const botsJson = localStorage.getItem(`bots-${gameId}`)
+    if (botsJson) {
+      try {
+        const botEntries = JSON.parse(botsJson) as { user_id: string; difficulty: 'medium' | 'hard' }[]
+        for (const bot of botEntries) {
+          registerBot(bot.user_id, bot.difficulty)
+        }
+      } catch {
+        // Ignore parse errors
+      }
+    }
+  }, [gameId])
+
+  // Process bot turns when game state changes
+  useEffect(() => {
+    if (!state || !gameId) return
+    if (state.phase === 'results') return
+
+    // Check if any players are bots
+    const hasBots = state.players.some(p => isBotPlayer(p.user_id))
+    if (!hasBots) return
+
+    // Small delay to let the UI render first
+    const timer = setTimeout(() => {
+      processBotTurn(gameId, state)
+    }, 500)
+
+    return () => clearTimeout(timer)
+  }, [state, gameId])
 
   const handleError = (err: unknown) => {
     setError(err instanceof Error ? err.message : 'Something went wrong')
