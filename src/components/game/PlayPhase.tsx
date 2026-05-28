@@ -13,12 +13,24 @@ interface Props {
   onIssueLiability: (handIndex: number) => void
   onEndTurn: () => void
   onFireCharacter: (targetPlayerId: string) => void
+  onDivestAsset: (targetPlayerId: string, assetIndex: number) => void
+  onSwapHands: (targetPlayerId: string) => void
+  onSwapWithDeck: (cardIndices: number[]) => void
+  onTerminateCredit: (targetPlayerId: string) => void
+  onRedeemLiability: (liabilityIndex: number) => void
 }
 
-export default function PlayPhase({ state, player, isMyTurn, onBuyAsset, onIssueLiability, onEndTurn, onFireCharacter }: Props) {
+export default function PlayPhase({
+  state, player, isMyTurn,
+  onBuyAsset, onIssueLiability, onEndTurn,
+  onFireCharacter, onDivestAsset, onSwapHands, onSwapWithDeck,
+  onTerminateCredit, onRedeemLiability,
+}: Props) {
   const [selectedCard, setSelectedCard] = useState<number | null>(null)
   const [showAbility, setShowAbility] = useState(false)
-  const [fireTarget, setFireTarget] = useState<string | null>(null)
+  const [abilityTarget, setAbilityTarget] = useState<string | null>(null)
+  const [divestAssetIdx, setDivestAssetIdx] = useState<number | null>(null)
+  const [swapDeckIndices, setSwapDeckIndices] = useState<number[]>([])
 
   const maxAssets = getPlayableAssets(player.character)
   const maxLiabilities = getPlayableLiabilities(player.character)
@@ -27,7 +39,8 @@ export default function PlayPhase({ state, player, isMyTurn, onBuyAsset, onIssue
     player.character === 'shareholder' ||
     player.character === 'stakeholder' ||
     player.character === 'regulator' ||
-    player.character === 'banker'
+    player.character === 'banker' ||
+    player.character === 'cfo'
   )
 
   const handleAction = () => {
@@ -41,18 +54,25 @@ export default function PlayPhase({ state, player, isMyTurn, onBuyAsset, onIssue
     setSelectedCard(null)
   }
 
-  const handleFire = () => {
-    if (!fireTarget) return
-    onFireCharacter(fireTarget)
+  const handleAbilityConfirm = () => {
+    if (player.character === 'shareholder' && abilityTarget) {
+      onFireCharacter(abilityTarget)
+    } else if (player.character === 'stakeholder' && abilityTarget && divestAssetIdx !== null) {
+      onDivestAsset(abilityTarget, divestAssetIdx)
+    } else if (player.character === 'regulator' && abilityTarget) {
+      onSwapHands(abilityTarget)
+    } else if (player.character === 'regulator' && swapDeckIndices.length > 0) {
+      onSwapWithDeck(swapDeckIndices)
+    } else if (player.character === 'banker' && abilityTarget) {
+      onTerminateCredit(abilityTarget)
+    }
     setShowAbility(false)
-    setFireTarget(null)
+    setAbilityTarget(null)
+    setDivestAssetIdx(null)
+    setSwapDeckIndices([])
   }
 
-  const fireableTargets = state.players.filter(p =>
-    p.user_id !== player.user_id &&
-    p.character !== 'banker' &&
-    p.character !== 'regulator'
-  )
+  const otherPlayers = state.players.filter(p => p.user_id !== player.user_id)
 
   if (!isMyTurn) {
     return (
@@ -78,9 +98,7 @@ export default function PlayPhase({ state, player, isMyTurn, onBuyAsset, onIssue
         <p className="text-gray-400 text-sm">
           Buy assets ({maxAssets} max) or issue liabilities ({maxLiabilities} max)
         </p>
-        <p className="text-amber-400 text-sm font-semibold mt-1">
-          Cash: {player.cash}g
-        </p>
+        <p className="text-amber-400 text-sm font-semibold mt-1">Cash: {player.cash}g</p>
       </div>
 
       <MarketDisplay market={state.market} events={state.current_events} />
@@ -125,6 +143,15 @@ export default function PlayPhase({ state, player, isMyTurn, onBuyAsset, onIssue
           </button>
         )}
 
+        {player.character === 'cfo' && player.liabilities.length > 0 && isMyTurn && (
+          <button
+            onClick={() => setShowAbility(!showAbility)}
+            className="px-6 py-2 bg-blue-700 hover:bg-blue-600 text-white font-semibold rounded-lg transition-colors"
+          >
+            Redeem Liability
+          </button>
+        )}
+
         <button
           onClick={onEndTurn}
           className="px-6 py-2 bg-gray-700 hover:bg-gray-600 border border-gray-500 text-white font-semibold rounded-lg transition-colors"
@@ -133,32 +160,168 @@ export default function PlayPhase({ state, player, isMyTurn, onBuyAsset, onIssue
         </button>
       </div>
 
-      {/* Ability panel */}
-      {showAbility && player.character === 'shareholder' && (
-        <div className="bg-gray-900 border border-orange-500/30 rounded-xl p-4 space-y-3">
-          <h3 className="text-sm font-semibold text-orange-400">Fire a Character</h3>
-          <p className="text-xs text-gray-400">Choose a player to skip their turn this round</p>
-          <div className="flex flex-wrap gap-2">
-            {fireableTargets.map(p => (
-              <button
-                key={p.id}
-                onClick={() => setFireTarget(p.id)}
-                className={`px-3 py-2 rounded-lg border text-sm transition-all ${
-                  fireTarget === p.id
-                    ? 'border-orange-500 bg-orange-500/10 text-orange-300'
-                    : 'border-gray-600 bg-gray-800 text-gray-300 hover:border-gray-500'
-                }`}
-              >
-                {p.name} ({p.character ? CHARACTER_INFO[p.character].name : '?'})
-              </button>
-            ))}
-          </div>
-          {fireTarget && (
+      {/* Ability panels */}
+      {showAbility && (
+        <div className="bg-gray-900 border border-purple-500/30 rounded-xl p-4 space-y-3">
+          {/* Shareholder: Fire */}
+          {player.character === 'shareholder' && (
+            <>
+              <h3 className="text-sm font-semibold text-orange-400">Fire a Character</h3>
+              <p className="text-xs text-gray-400">Choose a player to skip their turn</p>
+              <div className="flex flex-wrap gap-2">
+                {otherPlayers.filter(p => p.character !== 'banker' && p.character !== 'regulator').map(p => (
+                  <button
+                    key={p.id}
+                    onClick={() => setAbilityTarget(p.id)}
+                    className={`px-3 py-2 rounded-lg border text-sm ${
+                      abilityTarget === p.id ? 'border-orange-500 bg-orange-500/10 text-orange-300' : 'border-gray-600 bg-gray-800 text-gray-300 hover:border-gray-500'
+                    }`}
+                  >
+                    {p.name} ({p.character ? CHARACTER_INFO[p.character].name : '?'})
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+
+          {/* Stakeholder: Divest */}
+          {player.character === 'stakeholder' && (
+            <>
+              <h3 className="text-sm font-semibold text-red-400">Force Divestment</h3>
+              <p className="text-xs text-gray-400">Choose a player, then select a non-green/red asset to divest</p>
+              <div className="flex flex-wrap gap-2">
+                {otherPlayers.filter(p => p.character !== 'cso').map(p => (
+                  <button
+                    key={p.id}
+                    onClick={() => { setAbilityTarget(p.id); setDivestAssetIdx(null) }}
+                    className={`px-3 py-2 rounded-lg border text-sm ${
+                      abilityTarget === p.id ? 'border-red-500 bg-red-500/10 text-red-300' : 'border-gray-600 bg-gray-800 text-gray-300 hover:border-gray-500'
+                    }`}
+                  >
+                    {p.name} ({p.assets.length} assets)
+                  </button>
+                ))}
+              </div>
+              {abilityTarget && (
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {state.players.find(p => p.id === abilityTarget)?.assets
+                    .filter(a => a.color !== 'green' && a.color !== 'red')
+                    .map((a, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setDivestAssetIdx(i)}
+                        className={`px-2 py-1 rounded border text-xs capitalize ${
+                          divestAssetIdx === i ? 'border-red-500 bg-red-500/10' : 'border-gray-600 bg-gray-800'
+                        } text-gray-300`}
+                      >
+                        {a.color} {a.gold}g
+                      </button>
+                    ))}
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Regulator: Swap hands or deck */}
+          {player.character === 'regulator' && (
+            <>
+              <h3 className="text-sm font-semibold text-cyan-400">Regulator Ability</h3>
+              <div className="space-y-4">
+                <div>
+                  <p className="text-xs text-gray-400 mb-2">Option 1: Swap your hand with another player</p>
+                  <div className="flex flex-wrap gap-2">
+                    {otherPlayers.map(p => (
+                      <button
+                        key={p.id}
+                        onClick={() => { setAbilityTarget(p.id); setSwapDeckIndices([]) }}
+                        className={`px-3 py-2 rounded-lg border text-sm ${
+                          abilityTarget === p.id ? 'border-cyan-500 bg-cyan-500/10 text-cyan-300' : 'border-gray-600 bg-gray-800 text-gray-300 hover:border-gray-500'
+                        }`}
+                      >
+                        {p.name} ({p.hand.length} cards)
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="border-t border-gray-700 pt-3">
+                  <p className="text-xs text-gray-400 mb-2">Option 2: Return cards to deck and draw new ones</p>
+                  <div className="flex flex-wrap gap-2">
+                    {player.hand.map((card, i) => (
+                      <HandCard
+                        key={i}
+                        card={card}
+                        small
+                        selected={swapDeckIndices.includes(i)}
+                        onClick={() => {
+                          setAbilityTarget(null)
+                          setSwapDeckIndices(
+                            swapDeckIndices.includes(i)
+                              ? swapDeckIndices.filter(x => x !== i)
+                              : [...swapDeckIndices, i]
+                          )
+                        }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Banker: Terminate credit */}
+          {player.character === 'banker' && (
+            <>
+              <h3 className="text-sm font-semibold text-gray-300">Terminate Credit Line</h3>
+              <p className="text-xs text-gray-400">Target must sell assets or pay back liabilities</p>
+              <div className="flex flex-wrap gap-2">
+                {otherPlayers.filter(p => p.character !== 'shareholder' && p.character !== 'regulator').map(p => (
+                  <button
+                    key={p.id}
+                    onClick={() => setAbilityTarget(p.id)}
+                    className={`px-3 py-2 rounded-lg border text-sm ${
+                      abilityTarget === p.id ? 'border-gray-400 bg-gray-400/10 text-gray-200' : 'border-gray-600 bg-gray-800 text-gray-300 hover:border-gray-500'
+                    }`}
+                  >
+                    {p.name} ({p.character ? CHARACTER_INFO[p.character].name : '?'})
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+
+          {/* CFO: Redeem liability */}
+          {player.character === 'cfo' && (
+            <>
+              <h3 className="text-sm font-semibold text-blue-400">Redeem a Liability</h3>
+              <p className="text-xs text-gray-400">Pay off a liability at its current cost</p>
+              <div className="flex flex-wrap gap-2">
+                {player.liabilities.map((l, i) => {
+                  const cost = l.rfr_type === 'short_term'
+                    ? l.gold + state.market.rfr
+                    : l.gold + state.market.rfr + state.market.mrp
+                  return (
+                    <button
+                      key={i}
+                      onClick={() => onRedeemLiability(i)}
+                      disabled={player.cash < cost}
+                      className="px-3 py-2 rounded-lg border border-blue-500/30 bg-blue-500/5 text-sm text-gray-300 hover:border-blue-500 disabled:opacity-40"
+                    >
+                      {l.rfr_type.replace('_', ' ')} {l.gold}g (cost: {cost}g)
+                    </button>
+                  )
+                })}
+              </div>
+            </>
+          )}
+
+          {/* Confirm button */}
+          {(abilityTarget || swapDeckIndices.length > 0) && player.character !== 'cfo' && (
             <button
-              onClick={handleFire}
-              className="px-4 py-2 bg-orange-700 hover:bg-orange-600 text-white font-semibold rounded-lg text-sm"
+              onClick={handleAbilityConfirm}
+              disabled={player.character === 'stakeholder' && divestAssetIdx === null}
+              className="px-4 py-2 bg-purple-700 hover:bg-purple-600 disabled:opacity-40 text-white font-semibold rounded-lg text-sm"
             >
-              Confirm Fire
+              Confirm
             </button>
           )}
         </div>
