@@ -162,10 +162,268 @@ export async function putBackCard(gameId: string, userId: string, handIndex: num
       updates._liabilityDeck = [card, ...state._liabilityDeck]
     }
 
-    // Move to playing phase when done with draw/put-back
-    updates.phase = 'playing'
+    // cards_drawn tracks indices of newly drawn cards; each put-back reduces it
+    const remainingDrawn = player.cards_drawn.filter(idx => idx !== handIndex && idx < hand.length)
+    player.cards_drawn = remainingDrawn
+
+    players[playerIndex] = player
+    updates.players = players
+
+    // Move to playing phase if enough cards put back
+    if (remainingDrawn.length === 0) {
+      updates.phase = 'playing'
+    }
 
     transaction.update(gameRef, updates)
+  })
+}
+
+// Stakeholder ability: Force divestment of an asset
+export async function divestAsset(gameId: string, userId: string, targetPlayerId: string, assetIndex: number): Promise<void> {
+  const gameRef = doc(db, 'games', gameId)
+
+  await runTransaction(db, async (transaction) => {
+    const snapshot = await transaction.get(gameRef)
+    if (!snapshot.exists()) throw new Error('Game not found')
+
+    const state = snapshot.data() as GameState
+
+    const playerIndex = state.players.findIndex(p => p.user_id === userId)
+    const player = state.players[playerIndex]
+    if (player.character !== 'stakeholder') throw new Error('Not the stakeholder')
+    if (player.has_used_ability) throw new Error('Already used ability')
+
+    const targetIndex = state.players.findIndex(p => p.id === targetPlayerId)
+    const target = state.players[targetIndex]
+    if (!target) throw new Error('Target not found')
+    if (target.character === 'cso') throw new Error('Cannot force CSO to divest')
+
+    const asset = target.assets[assetIndex]
+    if (!asset) throw new Error('Asset not found')
+    if (asset.color === 'green' || asset.color === 'red') throw new Error('Cannot divest green or red assets')
+
+    // Remove asset, give target market value - 1 in cash
+    const condition = state.market[asset.color]
+    const modifier = condition === 'plus' ? 1 : condition === 'minus' ? -1 : 0
+    const marketValue = Math.max(0, asset.gold + modifier - 1)
+
+    const players = state.players.map((p, i) => {
+      if (i === playerIndex) return { ...p, has_used_ability: true }
+      if (i === targetIndex) {
+        const assets = [...p.assets]
+        assets.splice(assetIndex, 1)
+        return { ...p, assets, cash: p.cash + marketValue }
+      }
+      return p
+    })
+
+    transaction.update(gameRef, { players })
+  })
+}
+
+// Regulator ability: Swap hands with another player
+export async function swapHands(gameId: string, userId: string, targetPlayerId: string): Promise<void> {
+  const gameRef = doc(db, 'games', gameId)
+
+  await runTransaction(db, async (transaction) => {
+    const snapshot = await transaction.get(gameRef)
+    if (!snapshot.exists()) throw new Error('Game not found')
+
+    const state = snapshot.data() as GameState
+
+    const playerIndex = state.players.findIndex(p => p.user_id === userId)
+    const player = state.players[playerIndex]
+    if (player.character !== 'regulator') throw new Error('Not the regulator')
+    if (player.has_used_ability) throw new Error('Already used ability')
+
+    const targetIndex = state.players.findIndex(p => p.id === targetPlayerId)
+    const target = state.players[targetIndex]
+    if (!target) throw new Error('Target not found')
+
+    const players = state.players.map((p, i) => {
+      if (i === playerIndex) return { ...p, hand: target.hand, has_used_ability: true }
+      if (i === targetIndex) return { ...p, hand: player.hand }
+      return p
+    })
+
+    transaction.update(gameRef, { players })
+  })
+}
+
+// Regulator ability: Swap cards with deck
+export async function swapWithDeck(gameId: string, userId: string, cardIndices: number[]): Promise<void> {
+  const gameRef = doc(db, 'games', gameId)
+
+  await runTransaction(db, async (transaction) => {
+    const snapshot = await transaction.get(gameRef)
+    if (!snapshot.exists()) throw new Error('Game not found')
+
+    const state = snapshot.data() as GameState & {
+      _assetDeck: unknown[]
+      _liabilityDeck: unknown[]
+    }
+
+    const playerIndex = state.players.findIndex(p => p.user_id === userId)
+    const player = state.players[playerIndex]
+    if (player.character !== 'regulator') throw new Error('Not the regulator')
+    if (player.has_used_ability) throw new Error('Already used ability')
+
+    const hand = [...player.hand]
+    const assetDeck = [...state._assetDeck]
+    const liabilityDeck = [...state._liabilityDeck]
+
+    // Remove selected cards and put back to decks
+    const removed = cardIndices
+      .sort((a, b) => b - a)
+      .map(i => hand.splice(i, 1)[0])
+
+    for (const card of removed) {
+      if ('color' in card) {
+        assetDeck.unshift(card)
+      } else {
+        liabilityDeck.unshift(card)
+      }
+    }
+
+    // Draw same number of new cards (alternating asset/liability)
+    for (let i = 0; i < removed.length; i++) {
+      const deck = assetDeck.length > 0 ? assetDeck : liabilityDeck
+      if (deck.length > 0) {
+        hand.push(deck.pop()! as Asset | Liability)
+      }
+    }
+
+    const players = state.players.map((p, idx) =>
+      idx === playerIndex ? { ...p, hand, has_used_ability: true } : p
+    )
+
+    transaction.update(gameRef, {
+      players,
+      _assetDeck: assetDeck,
+      _liabilityDeck: liabilityDeck,
+    })
+  })
+}
+
+// Banker ability: Terminate credit line
+export async function terminateCredit(gameId: string, userId: string, targetPlayerId: string): Promise<void> {
+  const gameRef = doc(db, 'games', gameId)
+
+  await runTransaction(db, async (transaction) => {
+    const snapshot = await transaction.get(gameRef)
+    if (!snapshot.exists()) throw new Error('Game not found')
+
+    const state = snapshot.data() as GameState
+
+    const playerIndex = state.players.findIndex(p => p.user_id === userId)
+    const player = state.players[playerIndex]
+    if (player.character !== 'banker') throw new Error('Not the banker')
+    if (player.has_used_ability) throw new Error('Already used ability')
+
+    const target = state.players.find(p => p.id === targetPlayerId)
+    if (!target) throw new Error('Target not found')
+    if (target.character === 'shareholder' || target.character === 'regulator') {
+      throw new Error('Cannot terminate credit of shareholder or regulator')
+    }
+
+    // Mark ability used; target must pay back a liability or sell an asset
+    const players = state.players.map(p =>
+      p.user_id === userId ? { ...p, has_used_ability: true } : p
+    )
+
+    transaction.update(gameRef, {
+      players,
+      phase: 'banker_target',
+      _bankerTarget: targetPlayerId,
+    })
+  })
+}
+
+// Target of banker pays back (sells assets or issues liabilities to cover)
+export async function payBanker(gameId: string, userId: string, assetIndices: number[], liabilityIndices: number[]): Promise<void> {
+  const gameRef = doc(db, 'games', gameId)
+
+  await runTransaction(db, async (transaction) => {
+    const snapshot = await transaction.get(gameRef)
+    if (!snapshot.exists()) throw new Error('Game not found')
+
+    const state = snapshot.data() as GameState & { _bankerTarget: string }
+
+    const playerIndex = state.players.findIndex(p => p.user_id === userId)
+    const player = state.players[playerIndex]
+    if (state._bankerTarget !== player.id) throw new Error('Not the banker target')
+
+    // Sell selected assets at market value, pay back selected liabilities
+    let cash = player.cash
+    const assets = [...player.assets]
+    const liabilities = [...player.liabilities]
+
+    // Sell assets (reverse order to maintain indices)
+    for (const idx of [...assetIndices].sort((a, b) => b - a)) {
+      const asset = assets[idx]
+      if (asset) {
+        const condition = state.market[asset.color]
+        const modifier = condition === 'plus' ? 1 : condition === 'minus' ? -1 : 0
+        cash += asset.gold + modifier
+        assets.splice(idx, 1)
+      }
+    }
+
+    // Pay back liabilities (reverse order)
+    for (const idx of [...liabilityIndices].sort((a, b) => b - a)) {
+      const liability = liabilities[idx]
+      if (liability) {
+        const cost = liability.rfr_type === 'short_term'
+          ? liability.gold + state.market.rfr
+          : liability.gold + state.market.rfr + state.market.mrp
+        cash -= cost
+        liabilities.splice(idx, 1)
+      }
+    }
+
+    const players = state.players.map((p, i) =>
+      i === playerIndex ? { ...p, cash, assets, liabilities } : p
+    )
+
+    transaction.update(gameRef, {
+      players,
+      phase: 'playing',
+      _bankerTarget: null,
+    })
+  })
+}
+
+// CFO ability: Redeem a liability
+export async function redeemLiability(gameId: string, userId: string, liabilityIndex: number): Promise<void> {
+  const gameRef = doc(db, 'games', gameId)
+
+  await runTransaction(db, async (transaction) => {
+    const snapshot = await transaction.get(gameRef)
+    if (!snapshot.exists()) throw new Error('Game not found')
+
+    const state = snapshot.data() as GameState
+
+    const playerIndex = state.players.findIndex(p => p.user_id === userId)
+    const player = state.players[playerIndex]
+    if (player.character !== 'cfo') throw new Error('Not the CFO')
+
+    const liability = player.liabilities[liabilityIndex]
+    if (!liability) throw new Error('Liability not found')
+
+    const cost = liability.rfr_type === 'short_term'
+      ? liability.gold + state.market.rfr
+      : liability.gold + state.market.rfr + state.market.mrp
+
+    if (player.cash < cost) throw new Error('Not enough cash to redeem')
+
+    const liabilities = [...player.liabilities]
+    liabilities.splice(liabilityIndex, 1)
+
+    const players = state.players.map((p, i) =>
+      i === playerIndex ? { ...p, cash: p.cash - cost, liabilities } : p
+    )
+
+    transaction.update(gameRef, { players })
   })
 }
 
