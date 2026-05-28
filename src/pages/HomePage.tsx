@@ -17,7 +17,7 @@ export default function HomePage() {
   const { user, signOut } = useAuth()
   const navigate = useNavigate()
 
-  const displayName = user?.user_metadata?.display_name || user?.email?.split('@')[0] || 'Player'
+  const displayName = user?.displayName || user?.email?.split('@')[0] || 'Player'
 
   const handleCreate = () => {
     const code = generateRoomCode()

@@ -28,10 +28,6 @@ export default function LoginPage() {
 
     if (result.error) {
       setError(result.error.message)
-    } else if (isSignUp) {
-      setError('')
-      setIsSignUp(false)
-      alert('Check your email for a confirmation link!')
     } else {
       navigate('/')
     }

@@ -5,19 +5,20 @@ Digital multiplayer card game teaching economics concepts. Built for Maastricht 
 
 ## Stack
 - React + TypeScript + Vite + Tailwind CSS
-- Supabase (Auth, Database, Realtime, Edge Functions)
-- Hosted on Netlify (frontend) + Supabase Cloud EU (backend)
+- Firebase (Auth, Firestore, Cloud Functions)
+- Hosted on Netlify (frontend) + Firebase (backend, EU eur3 region)
 
 ## Architecture
 - **Frontend**: React SPA, pure renderer — no game logic on client
-- **Game Logic**: Supabase Edge Functions (authoritative server)
-- **Real-time**: Supabase Realtime channels (broadcast + presence)
-- **Auth**: Supabase Auth (email login)
-- **Database**: Supabase PostgreSQL (game state, scores, research data)
+- **Game Logic**: Firebase Cloud Functions (authoritative server)
+- **Real-time**: Firestore real-time listeners
+- **Auth**: Firebase Auth (email/password)
+- **Database**: Firestore (game state, scores, research data)
+- **Project ID**: stakeholder-delivery
 
 ## Key Conventions
-- All game rules enforced server-side (Edge Functions), never client-side
-- Frontend receives state updates and renders them
+- All game rules enforced server-side (Cloud Functions), never client-side
+- Frontend receives state updates via Firestore onSnapshot and renders them
 - Players authenticate before joining games
 - GDPR consent flow for research data opt-in
 - Build check: `npm run build`
