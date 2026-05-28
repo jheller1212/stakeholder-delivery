@@ -3,7 +3,6 @@ import type { Player, GameState } from '../../types/game'
 import { CHARACTER_INFO } from '../../types/game'
 import { getPlayableAssets, getPlayableLiabilities } from '../../lib/gameEngine'
 import { HandCard, isAsset } from './CardDisplay'
-import MarketDisplay from './MarketDisplay'
 
 interface Props {
   state: GameState
@@ -76,59 +75,62 @@ export default function PlayPhase({
 
   if (!isMyTurn) {
     return (
-      <div className="space-y-6">
-        <div className="text-center">
-          <h2 className="text-xl font-bold text-amber-400">Playing Phase</h2>
-          <p className="text-gray-400 text-sm">
+      <div className="flex flex-col items-center gap-4">
+        <img src="/chairman.png" alt="Chairman" className="w-16 h-16 rounded-full object-cover border-2 border-amber-500/40" />
+        <div className="panel-warm rounded-lg px-6 py-2.5">
+          <p className="text-amber-300 font-medium">
             {state.current_player_index !== null
               ? `${state.players[state.current_player_index].name} is playing...`
               : 'Waiting...'}
           </p>
         </div>
-        <MarketDisplay market={state.market} events={state.current_events} />
-        <MyAssets player={player} />
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
+    <div className="w-full max-w-lg mx-auto space-y-5">
+      {/* Turn header */}
       <div className="text-center">
-        <h2 className="text-xl font-bold text-amber-400">Your Turn</h2>
-        <p className="text-gray-400 text-sm">
-          Buy assets ({maxAssets} max) or issue liabilities ({maxLiabilities} max)
+        <p className="text-amber-300 font-bold text-lg">Your Turn</p>
+        <p className="text-gray-500 text-xs mt-1">
+          Buy assets ({maxAssets} max) · Issue liabilities ({maxLiabilities} max) · Cash: <span className="text-amber-400">{player.cash}g</span>
         </p>
-        <p className="text-amber-400 text-sm font-semibold mt-1">Cash: {player.cash}g</p>
       </div>
 
-      <MarketDisplay market={state.market} events={state.current_events} />
+      {/* Events */}
+      {state.current_events.length > 0 && (
+        <div className="panel-warm rounded-lg p-3 space-y-1">
+          {state.current_events.map(event => (
+            <div key={event.id} className="text-xs">
+              <span className="text-amber-400 font-semibold">{event.title}</span>
+              <span className="text-gray-500 ml-1.5">— {event.description}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
-      {/* Hand */}
-      <div className="space-y-2">
-        <h3 className="text-sm font-semibold text-gray-400">Your Hand</h3>
-        {player.hand.length === 0 ? (
-          <p className="text-gray-500 text-sm">No cards in hand</p>
-        ) : (
-          <div className="flex flex-wrap gap-3">
-            {player.hand.map((card, i) => (
-              <HandCard
-                key={i}
-                card={card}
-                market={state.market}
-                selected={selectedCard === i}
-                onClick={() => setSelectedCard(selectedCard === i ? null : i)}
-              />
-            ))}
-          </div>
-        )}
-      </div>
+      {/* Hand cards */}
+      {player.hand.length > 0 && (
+        <div className="flex flex-wrap gap-2.5 justify-center">
+          {player.hand.map((card, i) => (
+            <HandCard
+              key={i}
+              card={card}
+              market={state.market}
+              selected={selectedCard === i}
+              onClick={() => setSelectedCard(selectedCard === i ? null : i)}
+            />
+          ))}
+        </div>
+      )}
 
       {/* Action buttons */}
-      <div className="flex flex-wrap gap-3 justify-center">
+      <div className="flex flex-wrap gap-2 justify-center">
         {selectedCard !== null && (
           <button
             onClick={handleAction}
-            className="px-6 py-2 bg-emerald-700 hover:bg-emerald-600 text-white font-semibold rounded-lg transition-colors"
+            className="px-5 py-2 bg-emerald-700/80 hover:bg-emerald-600 text-white font-semibold rounded-lg transition-colors text-sm"
           >
             {isAsset(player.hand[selectedCard]) ? 'Buy Asset' : 'Issue Liability'}
           </button>
@@ -137,7 +139,7 @@ export default function PlayPhase({
         {canUseAbility && (
           <button
             onClick={() => setShowAbility(!showAbility)}
-            className="px-6 py-2 bg-purple-700 hover:bg-purple-600 text-white font-semibold rounded-lg transition-colors"
+            className="px-5 py-2 bg-purple-700/60 hover:bg-purple-600/80 text-purple-200 font-semibold rounded-lg transition-colors text-sm border border-purple-500/30"
           >
             Use Ability
           </button>
@@ -146,7 +148,7 @@ export default function PlayPhase({
         {player.character === 'cfo' && player.liabilities.length > 0 && isMyTurn && (
           <button
             onClick={() => setShowAbility(!showAbility)}
-            className="px-6 py-2 bg-blue-700 hover:bg-blue-600 text-white font-semibold rounded-lg transition-colors"
+            className="px-5 py-2 bg-blue-700/60 hover:bg-blue-600/80 text-blue-200 font-semibold rounded-lg transition-colors text-sm border border-blue-500/30"
           >
             Redeem Liability
           </button>
@@ -154,27 +156,27 @@ export default function PlayPhase({
 
         <button
           onClick={onEndTurn}
-          className="px-6 py-2 bg-gray-700 hover:bg-gray-600 border border-gray-500 text-white font-semibold rounded-lg transition-colors"
+          className="px-5 py-2 panel-warm hover:bg-gray-800/90 text-gray-300 font-semibold rounded-lg transition-colors text-sm"
         >
           End Turn
         </button>
       </div>
 
-      {/* Ability panels */}
+      {/* Ability panel */}
       {showAbility && (
-        <div className="bg-gray-900 border border-purple-500/30 rounded-xl p-4 space-y-3">
+        <div className="panel-warm rounded-xl p-4 space-y-3">
           {/* Shareholder: Fire */}
           {player.character === 'shareholder' && (
             <>
-              <h3 className="text-sm font-semibold text-orange-400">Fire a Character</h3>
-              <p className="text-xs text-gray-400">Choose a player to skip their turn</p>
+              <h3 className="text-xs font-semibold text-orange-400 uppercase tracking-wider">Fire a Character</h3>
+              <p className="text-[10px] text-gray-500">Choose a player to skip their turn</p>
               <div className="flex flex-wrap gap-2">
                 {otherPlayers.filter(p => p.character !== 'banker' && p.character !== 'regulator').map(p => (
                   <button
                     key={p.id}
                     onClick={() => setAbilityTarget(p.id)}
-                    className={`px-3 py-2 rounded-lg border text-sm ${
-                      abilityTarget === p.id ? 'border-orange-500 bg-orange-500/10 text-orange-300' : 'border-gray-600 bg-gray-800 text-gray-300 hover:border-gray-500'
+                    className={`px-3 py-1.5 rounded-lg border text-xs ${
+                      abilityTarget === p.id ? 'border-orange-500 bg-orange-500/10 text-orange-300' : 'border-gray-700 bg-gray-800/50 text-gray-400 hover:border-gray-600'
                     }`}
                   >
                     {p.name} ({p.character ? CHARACTER_INFO[p.character].name : '?'})
@@ -187,15 +189,15 @@ export default function PlayPhase({
           {/* Stakeholder: Divest */}
           {player.character === 'stakeholder' && (
             <>
-              <h3 className="text-sm font-semibold text-red-400">Force Divestment</h3>
-              <p className="text-xs text-gray-400">Choose a player, then select a non-green/red asset to divest</p>
+              <h3 className="text-xs font-semibold text-red-400 uppercase tracking-wider">Force Divestment</h3>
+              <p className="text-[10px] text-gray-500">Choose a player, then select a non-green/red asset</p>
               <div className="flex flex-wrap gap-2">
                 {otherPlayers.filter(p => p.character !== 'cso').map(p => (
                   <button
                     key={p.id}
                     onClick={() => { setAbilityTarget(p.id); setDivestAssetIdx(null) }}
-                    className={`px-3 py-2 rounded-lg border text-sm ${
-                      abilityTarget === p.id ? 'border-red-500 bg-red-500/10 text-red-300' : 'border-gray-600 bg-gray-800 text-gray-300 hover:border-gray-500'
+                    className={`px-3 py-1.5 rounded-lg border text-xs ${
+                      abilityTarget === p.id ? 'border-red-500 bg-red-500/10 text-red-300' : 'border-gray-700 bg-gray-800/50 text-gray-400 hover:border-gray-600'
                     }`}
                   >
                     {p.name} ({p.assets.length} assets)
@@ -210,9 +212,9 @@ export default function PlayPhase({
                       <button
                         key={i}
                         onClick={() => setDivestAssetIdx(i)}
-                        className={`px-2 py-1 rounded border text-xs capitalize ${
-                          divestAssetIdx === i ? 'border-red-500 bg-red-500/10' : 'border-gray-600 bg-gray-800'
-                        } text-gray-300`}
+                        className={`px-2 py-1 rounded border text-[10px] capitalize ${
+                          divestAssetIdx === i ? 'border-red-500 bg-red-500/10 text-red-300' : 'border-gray-700 bg-gray-800/50 text-gray-400'
+                        }`}
                       >
                         {a.color} {a.gold}g
                       </button>
@@ -222,20 +224,20 @@ export default function PlayPhase({
             </>
           )}
 
-          {/* Regulator: Swap hands or deck */}
+          {/* Regulator */}
           {player.character === 'regulator' && (
             <>
-              <h3 className="text-sm font-semibold text-cyan-400">Regulator Ability</h3>
-              <div className="space-y-4">
+              <h3 className="text-xs font-semibold text-cyan-400 uppercase tracking-wider">Regulator Ability</h3>
+              <div className="space-y-3">
                 <div>
-                  <p className="text-xs text-gray-400 mb-2">Option 1: Swap your hand with another player</p>
+                  <p className="text-[10px] text-gray-500 mb-2">Option 1: Swap hand with a player</p>
                   <div className="flex flex-wrap gap-2">
                     {otherPlayers.map(p => (
                       <button
                         key={p.id}
                         onClick={() => { setAbilityTarget(p.id); setSwapDeckIndices([]) }}
-                        className={`px-3 py-2 rounded-lg border text-sm ${
-                          abilityTarget === p.id ? 'border-cyan-500 bg-cyan-500/10 text-cyan-300' : 'border-gray-600 bg-gray-800 text-gray-300 hover:border-gray-500'
+                        className={`px-3 py-1.5 rounded-lg border text-xs ${
+                          abilityTarget === p.id ? 'border-cyan-500 bg-cyan-500/10 text-cyan-300' : 'border-gray-700 bg-gray-800/50 text-gray-400 hover:border-gray-600'
                         }`}
                       >
                         {p.name} ({p.hand.length} cards)
@@ -243,8 +245,8 @@ export default function PlayPhase({
                     ))}
                   </div>
                 </div>
-                <div className="border-t border-gray-700 pt-3">
-                  <p className="text-xs text-gray-400 mb-2">Option 2: Return cards to deck and draw new ones</p>
+                <div className="border-t border-gray-800 pt-3">
+                  <p className="text-[10px] text-gray-500 mb-2">Option 2: Return cards and draw new</p>
                   <div className="flex flex-wrap gap-2">
                     {player.hand.map((card, i) => (
                       <HandCard
@@ -268,18 +270,18 @@ export default function PlayPhase({
             </>
           )}
 
-          {/* Banker: Terminate credit */}
+          {/* Banker */}
           {player.character === 'banker' && (
             <>
-              <h3 className="text-sm font-semibold text-gray-300">Terminate Credit Line</h3>
-              <p className="text-xs text-gray-400">Target must sell assets or pay back liabilities</p>
+              <h3 className="text-xs font-semibold text-gray-300 uppercase tracking-wider">Terminate Credit Line</h3>
+              <p className="text-[10px] text-gray-500">Target must sell assets or pay back liabilities</p>
               <div className="flex flex-wrap gap-2">
                 {otherPlayers.filter(p => p.character !== 'shareholder' && p.character !== 'regulator').map(p => (
                   <button
                     key={p.id}
                     onClick={() => setAbilityTarget(p.id)}
-                    className={`px-3 py-2 rounded-lg border text-sm ${
-                      abilityTarget === p.id ? 'border-gray-400 bg-gray-400/10 text-gray-200' : 'border-gray-600 bg-gray-800 text-gray-300 hover:border-gray-500'
+                    className={`px-3 py-1.5 rounded-lg border text-xs ${
+                      abilityTarget === p.id ? 'border-gray-400 bg-gray-400/10 text-gray-200' : 'border-gray-700 bg-gray-800/50 text-gray-400 hover:border-gray-600'
                     }`}
                   >
                     {p.name} ({p.character ? CHARACTER_INFO[p.character].name : '?'})
@@ -289,11 +291,10 @@ export default function PlayPhase({
             </>
           )}
 
-          {/* CFO: Redeem liability */}
+          {/* CFO: Redeem */}
           {player.character === 'cfo' && (
             <>
-              <h3 className="text-sm font-semibold text-blue-400">Redeem a Liability</h3>
-              <p className="text-xs text-gray-400">Pay off a liability at its current cost</p>
+              <h3 className="text-xs font-semibold text-blue-400 uppercase tracking-wider">Redeem a Liability</h3>
               <div className="flex flex-wrap gap-2">
                 {player.liabilities.map((l, i) => {
                   const cost = l.rfr_type === 'short_term'
@@ -304,7 +305,7 @@ export default function PlayPhase({
                       key={i}
                       onClick={() => onRedeemLiability(i)}
                       disabled={player.cash < cost}
-                      className="px-3 py-2 rounded-lg border border-blue-500/30 bg-blue-500/5 text-sm text-gray-300 hover:border-blue-500 disabled:opacity-40"
+                      className="px-3 py-1.5 rounded-lg border border-blue-500/20 bg-blue-500/5 text-xs text-gray-400 hover:border-blue-500 disabled:opacity-30"
                     >
                       {l.rfr_type.replace('_', ' ')} {l.gold}g (cost: {cost}g)
                     </button>
@@ -314,55 +315,16 @@ export default function PlayPhase({
             </>
           )}
 
-          {/* Confirm button */}
+          {/* Confirm */}
           {(abilityTarget || swapDeckIndices.length > 0) && player.character !== 'cfo' && (
             <button
               onClick={handleAbilityConfirm}
               disabled={player.character === 'stakeholder' && divestAssetIdx === null}
-              className="px-4 py-2 bg-purple-700 hover:bg-purple-600 disabled:opacity-40 text-white font-semibold rounded-lg text-sm"
+              className="px-4 py-1.5 bg-purple-700/80 hover:bg-purple-600 disabled:opacity-30 text-white font-semibold rounded-lg text-xs"
             >
               Confirm
             </button>
           )}
-        </div>
-      )}
-
-      <MyAssets player={player} />
-    </div>
-  )
-}
-
-function MyAssets({ player }: { player: Player }) {
-  return (
-    <div className="space-y-3">
-      {player.assets.length > 0 && (
-        <div>
-          <h3 className="text-sm font-semibold text-gray-400 mb-1">Your Assets ({player.assets.length})</h3>
-          <div className="flex flex-wrap gap-2">
-            {player.assets.map((a, i) => (
-              <div key={i} className={`px-2 py-1 rounded border text-xs capitalize
-                ${a.color === 'red' ? 'border-red-500/50 text-red-300' :
-                  a.color === 'green' ? 'border-green-500/50 text-green-300' :
-                  a.color === 'blue' ? 'border-blue-500/50 text-blue-300' :
-                  a.color === 'yellow' ? 'border-yellow-500/50 text-yellow-300' :
-                  'border-purple-500/50 text-purple-300'}`}
-              >
-                {a.color} {a.gold}g {a.silver > 0 ? `${a.silver}s` : ''}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-      {player.liabilities.length > 0 && (
-        <div>
-          <h3 className="text-sm font-semibold text-gray-400 mb-1">Your Liabilities ({player.liabilities.length})</h3>
-          <div className="flex flex-wrap gap-2">
-            {player.liabilities.map((l, i) => (
-              <div key={i} className="px-2 py-1 rounded border border-gray-500/50 text-xs text-gray-300">
-                {l.rfr_type.replace('_', ' ')} {l.gold}g
-              </div>
-            ))}
-          </div>
         </div>
       )}
     </div>
