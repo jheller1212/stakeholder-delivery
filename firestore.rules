@@ -13,6 +13,11 @@ service cloud.firestore {
       }
     }
 
+    // GDPR consent: users can only read/write their own consent
+    match /consent/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
     // Games: any authenticated user can read; writes restricted to authenticated users
     // Full validation will move to Cloud Functions (server-authoritative)
     match /games/{gameId} {
