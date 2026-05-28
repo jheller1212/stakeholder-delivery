@@ -36,7 +36,7 @@ export default function BankerTarget({ state, player, isBankerTarget, onPayBanke
       <div className="text-center">
         <p className="text-red-400 font-bold text-lg">Credit Terminated!</p>
         <p className="text-gray-500 text-xs mt-1">
-          You must sell assets and/or pay back liabilities. Cash: <span className="text-amber-400">{player.cash}g</span>
+          You must sell assets and/or pay back liabilities. Cash: <span className="text-amber-400">{player.cash} gold</span>
         </p>
       </div>
 
@@ -57,7 +57,7 @@ export default function BankerTarget({ state, player, isBankerTarget, onPayBanke
                       : 'border-gray-700 bg-gray-800/50 text-gray-400 hover:border-gray-600'
                   }`}
                 >
-                  {a.color} {a.gold}g (value: {value}g)
+                  {a.color} ({a.gold} gold, value: {value})
                 </button>
               )
             })}
@@ -83,7 +83,7 @@ export default function BankerTarget({ state, player, isBankerTarget, onPayBanke
                       : 'border-gray-700 bg-gray-800/50 text-gray-400 hover:border-gray-600'
                   }`}
                 >
-                  {l.rfr_type.replace('_', ' ')} (cost: {cost}g)
+                  {l.rfr_type.replace('_', ' ')} (costs {cost} gold)
                 </button>
               )
             })}

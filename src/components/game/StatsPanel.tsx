@@ -35,7 +35,7 @@ export default function StatsPanel({ player, market, onClose }: Props) {
               return (
                 <div key={i} className="bg-gray-800/80 rounded p-1.5 text-center">
                   <div className={`w-3 h-3 rounded-full ${COLOR_BG[a.color]} mx-auto mb-0.5`} />
-                  <p className="text-[10px] text-amber-400 font-bold">{mv}g</p>
+                  <p className="text-[10px] text-amber-400 font-bold">{mv} gold</p>
                   {a.silver > 0 && <p className="text-[8px] text-gray-500">{a.silver}s</p>}
                 </div>
               )
@@ -58,7 +58,7 @@ export default function StatsPanel({ player, market, onClose }: Props) {
               return (
                 <div key={i} className="flex items-center justify-between bg-gray-800/80 rounded px-2 py-1">
                   <span className="text-[10px] text-gray-400 capitalize">{l.rfr_type.replace('_', ' ')}</span>
-                  <span className="text-[10px] text-red-400">-{cost}g</span>
+                  <span className="text-[10px] text-red-400">-{cost} gold</span>
                 </div>
               )
             })}

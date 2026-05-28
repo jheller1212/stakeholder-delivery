@@ -46,7 +46,7 @@ export default function PlayerSeats({ players, currentPlayerIndex, myUserId }: P
                 )}
                 {/* Cash badge */}
                 <span className="absolute -bottom-0.5 -right-0.5 bg-gray-900 text-amber-400 text-[8px] font-bold px-1 rounded-full border border-gray-700">
-                  {p.cash}g
+                  {p.cash}&#x2009;gold
                 </span>
               </div>
               {/* Name */}
