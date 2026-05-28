@@ -94,7 +94,7 @@ export default function PlayPhase({
       <div className="text-center">
         <p className="text-amber-300 font-bold text-lg">Your Turn</p>
         <p className="text-gray-500 text-xs mt-1">
-          Buy assets ({maxAssets} max) · Issue liabilities ({maxLiabilities} max) · Cash: <span className="text-amber-400">{player.cash}g</span>
+          Buy assets ({maxAssets} max) · Issue liabilities ({maxLiabilities} max) · Cash: <span className="text-amber-400">{player.cash} gold</span>
         </p>
       </div>
 
@@ -216,7 +216,7 @@ export default function PlayPhase({
                           divestAssetIdx === i ? 'border-red-500 bg-red-500/10 text-red-300' : 'border-gray-700 bg-gray-800/50 text-gray-400'
                         }`}
                       >
-                        {a.color} {a.gold}g
+                        {a.color} ({a.gold} gold)
                       </button>
                     ))}
                 </div>
@@ -307,7 +307,7 @@ export default function PlayPhase({
                       disabled={player.cash < cost}
                       className="px-3 py-1.5 rounded-lg border border-blue-500/20 bg-blue-500/5 text-xs text-gray-400 hover:border-blue-500 disabled:opacity-30"
                     >
-                      {l.rfr_type.replace('_', ' ')} {l.gold}g (cost: {cost}g)
+                      {l.rfr_type.replace('_', ' ')} +{l.gold} gold (costs {cost})
                     </button>
                   )
                 })}

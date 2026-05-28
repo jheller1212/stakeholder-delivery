@@ -112,7 +112,7 @@ export default function GamePage() {
               </div>
             )}
             <span className="absolute -bottom-1 -right-1 bg-amber-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-              {currentPlayer.cash}g
+              {currentPlayer.cash} gold
             </span>
           </button>
           <div className="text-xs mt-1">

@@ -8,12 +8,12 @@ const COLOR_MAP: Record<string, string> = {
   purple: 'border-purple-500/60 bg-purple-950/40',
 }
 
-const COLOR_DOT: Record<string, string> = {
-  red: 'bg-red-500',
-  green: 'bg-green-500',
-  blue: 'bg-blue-500',
-  yellow: 'bg-yellow-400',
-  purple: 'bg-purple-500',
+const COLOR_LABEL: Record<string, string> = {
+  red: 'text-red-400',
+  green: 'text-green-400',
+  blue: 'text-blue-400',
+  yellow: 'text-yellow-400',
+  purple: 'text-purple-400',
 }
 
 export function isAsset(card: Asset | Liability): card is Asset {
@@ -37,29 +37,37 @@ export function AssetCard({ asset, market, onClick, selected, small }: AssetCard
     <button
       onClick={onClick}
       disabled={!onClick}
-      className={`${small ? 'p-1.5 min-w-12' : 'p-2.5 min-w-20'} rounded-lg border-2 text-left transition-all ${
+      className={`${small ? 'p-1.5 min-w-14' : 'p-2.5 min-w-24'} rounded-lg border-2 text-left transition-all ${
         COLOR_MAP[asset.color]
       } ${selected ? 'ring-2 ring-white/20 scale-105 brightness-110' : ''} ${
         onClick ? 'hover:scale-105 hover:brightness-110 cursor-pointer' : 'cursor-default'
       }`}
     >
-      {/* Color dot + gold */}
-      <div className="flex items-center gap-1.5">
-        <div className={`${small ? 'w-2 h-2' : 'w-2.5 h-2.5'} rounded-full ${COLOR_DOT[asset.color]}`} />
-        <span className={`font-bold ${small ? 'text-xs' : 'text-sm'} text-amber-400`}>
-          {asset.gold}g
-        </span>
-        {asset.silver > 0 && (
-          <span className={`${small ? 'text-[9px]' : 'text-[10px]'} text-gray-500`}>{asset.silver}s</span>
-        )}
+      {/* Color label */}
+      <p className={`${small ? 'text-[9px]' : 'text-[10px]'} font-semibold uppercase tracking-wider ${COLOR_LABEL[asset.color]}`}>
+        {asset.color}
+      </p>
+      {/* Gold value */}
+      <div className="flex items-center gap-1 mt-0.5">
+        <span className={`${small ? 'text-sm' : 'text-base'} font-bold text-amber-400`}>{asset.gold}</span>
+        <span className={`${small ? 'text-[9px]' : 'text-[10px]'} text-amber-400/70`}>gold</span>
       </div>
+      {/* Silver value */}
+      {asset.silver > 0 && (
+        <div className="flex items-center gap-1">
+          <span className={`${small ? 'text-xs' : 'text-sm'} font-semibold text-gray-400`}>{asset.silver}</span>
+          <span className={`${small ? 'text-[9px]' : 'text-[10px]'} text-gray-500`}>silver</span>
+        </div>
+      )}
+      {/* Market value */}
       {marketValue !== undefined && (
-        <p className={`${small ? 'text-[9px]' : 'text-[10px]'} mt-0.5 ${modifier > 0 ? 'text-green-400' : modifier < 0 ? 'text-red-400' : 'text-gray-600'}`}>
-          mkt: {marketValue}g
+        <p className={`${small ? 'text-[9px]' : 'text-[10px]'} mt-1 ${modifier > 0 ? 'text-green-400' : modifier < 0 ? 'text-red-400' : 'text-gray-600'}`}>
+          Market: {marketValue}
         </p>
       )}
+      {/* Ability */}
       {asset.ability && (
-        <p className={`${small ? 'text-[8px]' : 'text-[9px]'} text-purple-300/70 mt-0.5`}>
+        <p className={`${small ? 'text-[8px]' : 'text-[9px]'} text-purple-300/70 mt-0.5 italic`}>
           {asset.ability.replace(/_/g, ' ')}
         </p>
       )}
@@ -86,22 +94,23 @@ export function LiabilityCard({ liability, market, onClick, selected, small }: L
     <button
       onClick={onClick}
       disabled={!onClick}
-      className={`${small ? 'p-1.5 min-w-12' : 'p-2.5 min-w-20'} rounded-lg border-2 border-gray-600/40 bg-gray-900/60 text-left transition-all ${
+      className={`${small ? 'p-1.5 min-w-14' : 'p-2.5 min-w-24'} rounded-lg border-2 border-gray-600/40 bg-gray-900/60 text-left transition-all ${
         selected ? 'ring-2 ring-white/20 scale-105 brightness-110' : ''
       } ${onClick ? 'hover:scale-105 hover:brightness-110 cursor-pointer' : 'cursor-default'}`}
     >
-      <div className="flex items-center gap-1.5">
-        <div className={`${small ? 'w-2 h-2' : 'w-2.5 h-2.5'} rounded-full bg-gray-500`} />
-        <span className={`font-bold ${small ? 'text-xs' : 'text-sm'} text-amber-400`}>
-          +{liability.gold}g
-        </span>
-      </div>
-      <p className={`${small ? 'text-[9px]' : 'text-[10px]'} text-gray-500 capitalize mt-0.5`}>
-        {liability.rfr_type.replace('_', ' ')}
+      {/* Type label */}
+      <p className={`${small ? 'text-[9px]' : 'text-[10px]'} font-semibold uppercase tracking-wider text-gray-500`}>
+        {liability.rfr_type === 'short_term' ? 'Short term' : 'Long term'}
       </p>
+      {/* Cash gain */}
+      <div className="flex items-center gap-1 mt-0.5">
+        <span className={`${small ? 'text-sm' : 'text-base'} font-bold text-amber-400`}>+{liability.gold}</span>
+        <span className={`${small ? 'text-[9px]' : 'text-[10px]'} text-amber-400/70`}>gold</span>
+      </div>
+      {/* Cost at end */}
       {cost !== undefined && (
-        <p className={`${small ? 'text-[9px]' : 'text-[10px]'} text-red-400/70`}>
-          cost: -{cost}g
+        <p className={`${small ? 'text-[9px]' : 'text-[10px]'} text-red-400/70 mt-1`}>
+          Costs: {cost} gold
         </p>
       )}
     </button>
