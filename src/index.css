@@ -1,1 +1,58 @@
 @import "tailwindcss";
+
+/* Game background */
+.game-bg {
+  background-image: linear-gradient(to bottom, rgba(0,0,0,0.3), rgba(0,0,0,0.5)), url(/boardroom-bg.png);
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+}
+
+/* Card tray slide-up */
+.card-tray {
+  transition: transform 0.3s ease-in-out;
+}
+.card-tray.collapsed {
+  transform: translateY(calc(100% - 48px));
+}
+
+/* Character portrait glow */
+.portrait-glow {
+  box-shadow: 0 0 30px rgba(212, 175, 55, 0.3), 0 0 60px rgba(212, 175, 55, 0.1);
+}
+
+/* Warm ambient glow for panels */
+.panel-warm {
+  background: linear-gradient(135deg, rgba(30, 25, 20, 0.9), rgba(20, 18, 15, 0.95));
+  border: 1px solid rgba(212, 175, 55, 0.15);
+}
+
+/* Market dot pulse animation */
+@keyframes dot-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+.dot-pulse {
+  animation: dot-pulse 2s ease-in-out infinite;
+}
+
+/* Seat shimmer for current player */
+@keyframes seat-glow {
+  0%, 100% { box-shadow: 0 0 8px rgba(212, 175, 55, 0.3); }
+  50% { box-shadow: 0 0 20px rgba(212, 175, 55, 0.6); }
+}
+.seat-active {
+  animation: seat-glow 2s ease-in-out infinite;
+}
+
+/* Scrollbar styling for card tray */
+.card-scroll::-webkit-scrollbar {
+  height: 4px;
+}
+.card-scroll::-webkit-scrollbar-track {
+  background: rgba(0,0,0,0.2);
+}
+.card-scroll::-webkit-scrollbar-thumb {
+  background: rgba(212, 175, 55, 0.3);
+  border-radius: 2px;
+}

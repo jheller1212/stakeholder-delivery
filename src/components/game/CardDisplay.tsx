@@ -1,11 +1,19 @@
 import type { Asset, Liability, Market } from '../../types/game'
 
 const COLOR_MAP: Record<string, string> = {
-  red: 'border-red-500 bg-red-500/10',
-  green: 'border-green-500 bg-green-500/10',
-  blue: 'border-blue-500 bg-blue-500/10',
-  yellow: 'border-yellow-500 bg-yellow-500/10',
-  purple: 'border-purple-500 bg-purple-500/10',
+  red: 'border-red-500/60 bg-red-950/40',
+  green: 'border-green-500/60 bg-green-950/40',
+  blue: 'border-blue-500/60 bg-blue-950/40',
+  yellow: 'border-yellow-500/60 bg-yellow-950/40',
+  purple: 'border-purple-500/60 bg-purple-950/40',
+}
+
+const COLOR_DOT: Record<string, string> = {
+  red: 'bg-red-500',
+  green: 'bg-green-500',
+  blue: 'bg-blue-500',
+  yellow: 'bg-yellow-400',
+  purple: 'bg-purple-500',
 }
 
 export function isAsset(card: Asset | Liability): card is Asset {
@@ -29,30 +37,29 @@ export function AssetCard({ asset, market, onClick, selected, small }: AssetCard
     <button
       onClick={onClick}
       disabled={!onClick}
-      className={`${small ? 'p-2' : 'p-3'} rounded-lg border-2 text-left transition-all ${
+      className={`${small ? 'p-1.5 min-w-12' : 'p-2.5 min-w-20'} rounded-lg border-2 text-left transition-all ${
         COLOR_MAP[asset.color]
-      } ${selected ? 'ring-2 ring-white/30 scale-105' : ''} ${
-        onClick ? 'hover:scale-105 cursor-pointer' : 'cursor-default'
+      } ${selected ? 'ring-2 ring-white/20 scale-105 brightness-110' : ''} ${
+        onClick ? 'hover:scale-105 hover:brightness-110 cursor-pointer' : 'cursor-default'
       }`}
     >
-      <div className="flex items-center justify-between">
-        <span className={`font-bold ${small ? 'text-sm' : 'text-lg'} text-amber-400`}>
+      {/* Color dot + gold */}
+      <div className="flex items-center gap-1.5">
+        <div className={`${small ? 'w-2 h-2' : 'w-2.5 h-2.5'} rounded-full ${COLOR_DOT[asset.color]}`} />
+        <span className={`font-bold ${small ? 'text-xs' : 'text-sm'} text-amber-400`}>
           {asset.gold}g
         </span>
         {asset.silver > 0 && (
-          <span className={`${small ? 'text-xs' : 'text-sm'} text-gray-400`}>{asset.silver}s</span>
+          <span className={`${small ? 'text-[9px]' : 'text-[10px]'} text-gray-500`}>{asset.silver}s</span>
         )}
       </div>
-      <p className={`${small ? 'text-[10px]' : 'text-xs'} text-gray-400 capitalize mt-0.5`}>
-        {asset.color}
-      </p>
       {marketValue !== undefined && (
-        <p className={`${small ? 'text-[10px]' : 'text-xs'} ${modifier > 0 ? 'text-green-400' : modifier < 0 ? 'text-red-400' : 'text-gray-500'}`}>
-          Market: {marketValue}g
+        <p className={`${small ? 'text-[9px]' : 'text-[10px]'} mt-0.5 ${modifier > 0 ? 'text-green-400' : modifier < 0 ? 'text-red-400' : 'text-gray-600'}`}>
+          mkt: {marketValue}g
         </p>
       )}
       {asset.ability && (
-        <p className={`${small ? 'text-[10px]' : 'text-xs'} text-purple-300 mt-0.5`}>
+        <p className={`${small ? 'text-[8px]' : 'text-[9px]'} text-purple-300/70 mt-0.5`}>
           {asset.ability.replace(/_/g, ' ')}
         </p>
       )}
@@ -79,21 +86,22 @@ export function LiabilityCard({ liability, market, onClick, selected, small }: L
     <button
       onClick={onClick}
       disabled={!onClick}
-      className={`${small ? 'p-2' : 'p-3'} rounded-lg border-2 border-gray-500 bg-gray-500/10 text-left transition-all ${
-        selected ? 'ring-2 ring-white/30 scale-105' : ''
-      } ${onClick ? 'hover:scale-105 cursor-pointer' : 'cursor-default'}`}
+      className={`${small ? 'p-1.5 min-w-12' : 'p-2.5 min-w-20'} rounded-lg border-2 border-gray-600/40 bg-gray-900/60 text-left transition-all ${
+        selected ? 'ring-2 ring-white/20 scale-105 brightness-110' : ''
+      } ${onClick ? 'hover:scale-105 hover:brightness-110 cursor-pointer' : 'cursor-default'}`}
     >
-      <div className="flex items-center justify-between">
-        <span className={`font-bold ${small ? 'text-sm' : 'text-lg'} text-amber-400`}>
+      <div className="flex items-center gap-1.5">
+        <div className={`${small ? 'w-2 h-2' : 'w-2.5 h-2.5'} rounded-full bg-gray-500`} />
+        <span className={`font-bold ${small ? 'text-xs' : 'text-sm'} text-amber-400`}>
           +{liability.gold}g
         </span>
       </div>
-      <p className={`${small ? 'text-[10px]' : 'text-xs'} text-gray-400 capitalize mt-0.5`}>
+      <p className={`${small ? 'text-[9px]' : 'text-[10px]'} text-gray-500 capitalize mt-0.5`}>
         {liability.rfr_type.replace('_', ' ')}
       </p>
       {cost !== undefined && (
-        <p className={`${small ? 'text-[10px]' : 'text-xs'} text-red-400`}>
-          Cost: -{cost}g
+        <p className={`${small ? 'text-[9px]' : 'text-[10px]'} text-red-400/70`}>
+          cost: -{cost}g
         </p>
       )}
     </button>
