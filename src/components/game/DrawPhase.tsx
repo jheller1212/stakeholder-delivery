@@ -1,17 +1,20 @@
 import { useState } from 'react'
-import type { Player, Market } from '../../types/game'
+import type { Player, Market, GameState } from '../../types/game'
 import { getDrawCount, getPutBackCount } from '../../lib/gameEngine'
 import { HandCard } from './CardDisplay'
+import BotTurnOverlay from './BotTurnOverlay'
+import { isBotPlayer } from '../../lib/botEngine'
 
 interface Props {
   player: Player
   isMyTurn: boolean
   market: Market
+  state: GameState
   onDrawCard: (type: 'asset' | 'liability') => void
   onPutBackCard: (handIndex: number) => void
 }
 
-export default function DrawPhase({ player, isMyTurn, market, onDrawCard, onPutBackCard }: Props) {
+export default function DrawPhase({ player, isMyTurn, market, state, onDrawCard, onPutBackCard }: Props) {
   const [putBackIndex, setPutBackIndex] = useState<number | null>(null)
   const drawCount = getDrawCount(player.character)
   const putBackCount = getPutBackCount(player.character)
@@ -20,13 +23,18 @@ export default function DrawPhase({ player, isMyTurn, market, onDrawCard, onPutB
   const needsToPutBack = !needsToDrawMore && player.cards_drawn.length > 0
 
   if (!isMyTurn) {
+    const activePlayer = state.current_player_index !== null ? state.players[state.current_player_index] : null
+    if (activePlayer && isBotPlayer(activePlayer.user_id)) {
+      return <BotTurnOverlay player={activePlayer} phase="drawing" />
+    }
     return (
       <div className="flex flex-col items-center gap-4">
         <img src="/chairman.png" alt="Chairman" className="w-16 h-16 rounded-full object-cover border-2 border-amber-500/40" />
         <div className="panel-warm rounded-lg px-6 py-2.5">
-          <p className="text-amber-300 font-medium">Drawing Phase</p>
+          <p className="text-amber-300 font-medium">
+            {activePlayer ? `${activePlayer.name} is drawing cards...` : 'Drawing Phase'}
+          </p>
         </div>
-        <p className="text-gray-500 text-sm">Waiting for the current player to draw cards...</p>
       </div>
     )
   }
