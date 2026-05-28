@@ -1,10 +1,14 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { useGame, useCurrentPlayer, useIsMyTurn, useAvailableCharacters } from '../hooks/useGame'
-import { selectCharacter, drawCard, putBackCard, buyAsset, issueLiability, endTurn, fireCharacter } from '../lib/gameService'
+import {
+  selectCharacter, drawCard, putBackCard, buyAsset, issueLiability, endTurn,
+  fireCharacter, divestAsset, swapHands, swapWithDeck, terminateCredit, payBanker, redeemLiability,
+} from '../lib/gameService'
 import CharacterSelect from '../components/game/CharacterSelect'
 import DrawPhase from '../components/game/DrawPhase'
 import PlayPhase from '../components/game/PlayPhase'
+import BankerTarget from '../components/game/BankerTarget'
 import ResultsScreen from '../components/game/ResultsScreen'
 import PlayerBar from '../components/game/PlayerBar'
 import type { Character } from '../types/game'
@@ -40,6 +44,9 @@ export default function GamePage() {
       </div>
     )
   }
+
+  const bankerTarget = (state as unknown as Record<string, unknown>)._bankerTarget as string | null
+  const isBankerTarget = bankerTarget === currentPlayer.id
 
   return (
     <div className="min-h-screen bg-gray-950 px-4 py-4">
@@ -110,18 +117,24 @@ export default function GamePage() {
               state={state}
               player={currentPlayer}
               isMyTurn={isMyTurn}
-              onBuyAsset={(index) => {
-                buyAsset(gameId!, user!.uid, index).catch(handleError)
-              }}
-              onIssueLiability={(index) => {
-                issueLiability(gameId!, user!.uid, index).catch(handleError)
-              }}
-              onEndTurn={() => {
-                endTurn(gameId!, user!.uid).catch(handleError)
-              }}
-              onFireCharacter={(targetId) => {
-                fireCharacter(gameId!, user!.uid, targetId).catch(handleError)
-              }}
+              onBuyAsset={(index) => buyAsset(gameId!, user!.uid, index).catch(handleError)}
+              onIssueLiability={(index) => issueLiability(gameId!, user!.uid, index).catch(handleError)}
+              onEndTurn={() => endTurn(gameId!, user!.uid).catch(handleError)}
+              onFireCharacter={(targetId) => fireCharacter(gameId!, user!.uid, targetId).catch(handleError)}
+              onDivestAsset={(targetId, idx) => divestAsset(gameId!, user!.uid, targetId, idx).catch(handleError)}
+              onSwapHands={(targetId) => swapHands(gameId!, user!.uid, targetId).catch(handleError)}
+              onSwapWithDeck={(indices) => swapWithDeck(gameId!, user!.uid, indices).catch(handleError)}
+              onTerminateCredit={(targetId) => terminateCredit(gameId!, user!.uid, targetId).catch(handleError)}
+              onRedeemLiability={(idx) => redeemLiability(gameId!, user!.uid, idx).catch(handleError)}
+            />
+          )}
+
+          {state.phase === 'banker_target' && (
+            <BankerTarget
+              state={state}
+              player={currentPlayer}
+              isBankerTarget={isBankerTarget}
+              onPayBanker={(assets, liabilities) => payBanker(gameId!, user!.uid, assets, liabilities).catch(handleError)}
             />
           )}
 
