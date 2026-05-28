@@ -94,7 +94,7 @@ export default function LobbyPage() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-4"
       style={{
-        backgroundImage: 'linear-gradient(to bottom, rgba(0,0,0,0.6), rgba(0,0,0,0.8)), url(/boardroom-bg.jpg)',
+        backgroundImage: 'linear-gradient(to bottom, rgba(0,0,0,0.6), rgba(0,0,0,0.8)), url(/boardroom-bg.png)',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
       }}

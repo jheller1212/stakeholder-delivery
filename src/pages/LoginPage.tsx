@@ -37,7 +37,7 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-4"
       style={{
-        backgroundImage: 'linear-gradient(to bottom, rgba(0,0,0,0.7), rgba(0,0,0,0.85)), url(/boardroom-bg.jpg)',
+        backgroundImage: 'linear-gradient(to bottom, rgba(0,0,0,0.7), rgba(0,0,0,0.85)), url(/boardroom-bg.png)',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
       }}

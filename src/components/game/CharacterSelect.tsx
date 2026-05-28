@@ -9,6 +9,16 @@ interface Props {
   onSelect: (character: Character) => void
 }
 
+const CHARACTER_PORTRAITS: Partial<Record<Character, string>> = {
+  head_of_rnd: '/characters/head_of_rnd.png',
+  ceo: '/characters/ceo.png',
+  cso: '/characters/cso.png',
+  cfo: '/characters/cfo.png',
+  shareholder: '/characters/shareholder.png',
+  stakeholder: '/characters/stakeholder.png',
+  banker: '/characters/banker.png',
+}
+
 const CHARACTER_COLORS: Record<Character, string> = {
   head_of_rnd: 'border-purple-500 bg-purple-500/10',
   ceo: 'border-yellow-500 bg-yellow-500/10',
@@ -103,12 +113,23 @@ export default function CharacterSelect({ availableCharacters, state, isMyTurn, 
                   : 'border-gray-700 bg-gray-800/50 hover:border-gray-500'
               }`}
             >
-              <p className="font-semibold text-gray-100">{char.name}</p>
-              <ul className="mt-2 space-y-1">
-                {char.abilities.map((a, i) => (
-                  <li key={i} className="text-xs text-gray-400">{a}</li>
-                ))}
-              </ul>
+              <div className="flex items-start gap-3">
+                {CHARACTER_PORTRAITS[key] && (
+                  <img
+                    src={CHARACTER_PORTRAITS[key]}
+                    alt={char.name}
+                    className="w-14 h-14 rounded-full object-cover flex-shrink-0"
+                  />
+                )}
+                <div>
+                  <p className="font-semibold text-gray-100">{char.name}</p>
+                  <ul className="mt-1 space-y-0.5">
+                    {char.abilities.map((a, i) => (
+                      <li key={i} className="text-xs text-gray-400">{a}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
             </button>
           )
         })}

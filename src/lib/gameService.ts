@@ -428,6 +428,7 @@ export async function redeemLiability(gameId: string, userId: string, liabilityI
 }
 
 // Buy an asset from hand
+// Rule 8: A new market card should be drawn when someone buys the 1st, 2nd, 3rd, 4th, 5th, 7th, or 8th asset (global count)
 export async function buyAsset(gameId: string, userId: string, handIndex: number): Promise<void> {
   const gameRef = doc(db, 'games', gameId)
 
@@ -435,7 +436,10 @@ export async function buyAsset(gameId: string, userId: string, handIndex: number
     const snapshot = await transaction.get(gameRef)
     if (!snapshot.exists()) throw new Error('Game not found')
 
-    const state = snapshot.data() as GameState & { _marketEventDeck: unknown[] }
+    const state = snapshot.data() as GameState & {
+      _marketEventDeck: (import('../types/game').Market | import('../types/game').GameEvent)[]
+      _totalAssetsBought?: number
+    }
 
     if (state.phase !== 'playing') throw new Error('Not in playing phase')
 
@@ -448,22 +452,52 @@ export async function buyAsset(gameId: string, userId: string, handIndex: number
     const card = hand[handIndex]
 
     if (!card || !('color' in card)) throw new Error('Not an asset card')
+    const assetCard = card as Asset
 
     // Check if player can afford it
-    if (player.cash < (card as { gold: number }).gold) throw new Error('Not enough cash')
+    if (player.cash < assetCard.gold) throw new Error('Not enough cash')
 
     // Remove from hand, add to assets
-    const [asset] = hand.splice(handIndex, 1)
+    hand.splice(handIndex, 1)
     player.hand = hand
-    player.assets = [...player.assets, asset as unknown as import('../types/game').Asset]
-    player.cash -= (asset as { gold: number }).gold
+    player.assets = [...player.assets, assetCard]
+    player.cash -= assetCard.gold
 
     const players = [...state.players]
     players[playerIndex] = player
 
     const updates: Record<string, unknown> = { players }
 
-    // Check end game condition
+    // Track global asset buy count for market refresh (Rule 8)
+    const newTotalBought = (state._totalAssetsBought || 0) + 1
+    updates._totalAssetsBought = newTotalBought
+
+    // Market refreshes at 1st, 2nd, 3rd, 4th, 5th, 7th, 8th asset bought
+    const REFRESH_AT = [1, 2, 3, 4, 5, 7, 8]
+    if (REFRESH_AT.includes(newTotalBought) && state._marketEventDeck.length > 0) {
+      const marketDeck = [...state._marketEventDeck]
+      const events: import('../types/game').GameEvent[] = [...state.current_events]
+
+      // Draw cards from market/event deck until we find a Market card
+      // Events encountered along the way get added to current_events
+      let newMarket = state.market
+      while (marketDeck.length > 0) {
+        const drawn = marketDeck.pop()!
+        if ('rfr' in drawn && 'mrp' in drawn) {
+          // It's a Market card
+          newMarket = drawn as import('../types/game').Market
+          break
+        } else {
+          // It's an Event card — accumulate it
+          events.push(drawn as import('../types/game').GameEvent)
+        }
+      }
+      updates.market = newMarket
+      updates.current_events = events
+      updates._marketEventDeck = marketDeck
+    }
+
+    // Check end game condition (Rule 6)
     if (player.assets.length >= 6 && !state.is_final_round) {
       updates.is_final_round = true
     }

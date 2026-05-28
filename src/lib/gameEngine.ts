@@ -152,15 +152,27 @@ export function createInitialGameState(
     _marketEventDeck: marketEventDeck,
     _availableCharacters: ALL_CHARACTERS.slice(0, Math.min(playerData.length + 1, ALL_CHARACTERS.length)),
     _firedCharacters: [],
+    _totalAssetsBought: 0,
   } as GameState & Record<string, unknown>
 }
 
 // How many assets a player can buy based on character
+// Per original docs (section 2.8.2):
+// - CEO: budget 3, each color costs 1
+// - CSO: budget 2, red/green cost 1, blue/purple/yellow cost 2
+// - Everyone else: budget 1, each color costs 1
 export function getPlayableAssets(character?: Character): number {
   if (!character) return 1
   if (character === 'ceo') return 3
   if (character === 'cso') return 2
   return 1
+}
+
+// CSO asset cost per color (from original docs section 2.8.2)
+// CSO has a 2-unit budget. Red/Green cost 1 unit, Blue/Purple/Yellow cost 2 units.
+export function getCSOAssetCost(color: CardColor): number {
+  if (color === 'red' || color === 'green') return 1
+  return 2 // blue, purple, yellow
 }
 
 // How many liabilities a player can issue based on character
