@@ -63,7 +63,7 @@ export default function LobbyPage() {
   }, [user, roomCode, displayName, navigate, gameStarted])
 
   const handleStartGame = async () => {
-    if (!roomCode || players.length < 2) return
+    if (!roomCode || players.length < 1) return
     const gameId = crypto.randomUUID()
     // Create the game state in Firestore
     await createGame(gameId, roomCode, players.map(p => ({ user_id: p.user_id, name: p.name })))
