@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { db } from '../lib/firebase'
 import { doc, setDoc, deleteDoc, onSnapshot, collection, serverTimestamp } from 'firebase/firestore'
+import { createGame } from '../lib/gameService'
 
 interface LobbyPlayer {
   user_id: string
@@ -64,7 +65,9 @@ export default function LobbyPage() {
   const handleStartGame = async () => {
     if (!roomCode || players.length < 2) return
     const gameId = crypto.randomUUID()
-    // Set game_id on lobby doc to signal all clients
+    // Create the game state in Firestore
+    await createGame(gameId, roomCode, players.map(p => ({ user_id: p.user_id, name: p.name })))
+    // Signal all lobby clients to navigate to the game
     await setDoc(doc(db, 'lobbies', roomCode), { game_id: gameId, started_at: serverTimestamp() }, { merge: true })
   }
 
@@ -149,7 +152,7 @@ export default function LobbyPage() {
         {isHost && (
           <button
             onClick={handleStartGame}
-            disabled={players.length < 2}
+            disabled={players.length < 1}
             className="px-8 py-3 bg-amber-600 hover:bg-amber-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold rounded-lg text-lg transition-colors"
           >
             Start Meeting
