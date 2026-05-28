@@ -1,6 +1,6 @@
 import { doc, setDoc, onSnapshot, getDoc, runTransaction } from 'firebase/firestore'
 import { db } from './firebase'
-import { createInitialGameState } from './gameEngine'
+import { createInitialGameState, getPlayableAssets, getPlayableLiabilities, applyEventEffects } from './gameEngine'
 import type { GameState, Character, Asset, Liability } from '../types/game'
 
 // Create a new game from lobby players
@@ -339,15 +339,24 @@ export async function terminateCredit(gameId: string, userId: string, targetPlay
   })
 }
 
-// Target of banker pays back (sells assets or issues liabilities to cover)
-export async function payBanker(gameId: string, userId: string, assetIndices: number[], liabilityIndices: number[]): Promise<void> {
+// Target of banker pays back (sells assets and/or pays liabilities; CFO can also issue a liability)
+export async function payBanker(
+  gameId: string,
+  userId: string,
+  assetIndices: number[],
+  liabilityIndices: number[],
+  issueLiabilityIndex?: number,
+): Promise<void> {
   const gameRef = doc(db, 'games', gameId)
 
   await runTransaction(db, async (transaction) => {
     const snapshot = await transaction.get(gameRef)
     if (!snapshot.exists()) throw new Error('Game not found')
 
-    const state = snapshot.data() as GameState & { _bankerTarget: string }
+    const state = snapshot.data() as GameState & {
+      _bankerTarget: string
+      _liabilityDeck: unknown[]
+    }
 
     const playerIndex = state.players.findIndex(p => p.user_id === userId)
     const player = state.players[playerIndex]
@@ -381,15 +390,34 @@ export async function payBanker(gameId: string, userId: string, assetIndices: nu
       }
     }
 
-    const players = state.players.map((p, i) =>
-      i === playerIndex ? { ...p, cash, assets, liabilities } : p
-    )
-
-    transaction.update(gameRef, {
-      players,
+    const updates: Record<string, unknown> = {
       phase: 'playing',
       _bankerTarget: null,
-    })
+    }
+
+    // CFO special: can issue a liability from hand to raise cash for payment
+    if (issueLiabilityIndex !== undefined && player.character === 'cfo') {
+      const hand = [...player.hand]
+      const card = hand[issueLiabilityIndex]
+      if (card && 'rfr_type' in card) {
+        hand.splice(issueLiabilityIndex, 1)
+        liabilities.push(card as Liability)
+        cash += (card as Liability).gold
+        const players = state.players.map((p, i) =>
+          i === playerIndex ? { ...p, cash, assets, liabilities, hand } : p
+        )
+        updates.players = players
+      } else {
+        throw new Error('Not a liability card')
+      }
+    } else {
+      const players = state.players.map((p, i) =>
+        i === playerIndex ? { ...p, cash, assets, liabilities } : p
+      )
+      updates.players = players
+    }
+
+    transaction.update(gameRef, updates)
   })
 }
 
@@ -454,6 +482,10 @@ export async function buyAsset(gameId: string, userId: string, handIndex: number
     if (!card || !('color' in card)) throw new Error('Not an asset card')
     const assetCard = card as Asset
 
+    // Enforce per-turn buy limit based on character
+    const maxAssets = getPlayableAssets(player.character)
+    if (player.assets_bought_this_turn >= maxAssets) throw new Error('Already bought maximum assets this turn')
+
     // Check if player can afford it
     if (player.cash < assetCard.gold) throw new Error('Not enough cash')
 
@@ -462,6 +494,7 @@ export async function buyAsset(gameId: string, userId: string, handIndex: number
     player.hand = hand
     player.assets = [...player.assets, assetCard]
     player.cash -= assetCard.gold
+    player.assets_bought_this_turn += 1
 
     const players = [...state.players]
     players[playerIndex] = player
@@ -495,6 +528,23 @@ export async function buyAsset(gameId: string, userId: string, handIndex: number
       updates.market = newMarket
       updates.current_events = events
       updates._marketEventDeck = marketDeck
+
+      // Apply event effects to all players' assets
+      let updatedPlayers = updates.players as typeof players || players
+      for (const event of events) {
+        if (event.plus_gold || event.minus_gold) {
+          updatedPlayers = applyEventEffects(updatedPlayers, event)
+        }
+        // Track skip_turn events
+        if (event.skip_turn) {
+          const firedChars = [...((state as unknown as Record<string, unknown>)._firedCharacters as Character[] || [])]
+          if (!firedChars.includes(event.skip_turn)) {
+            firedChars.push(event.skip_turn)
+            updates._firedCharacters = firedChars
+          }
+        }
+      }
+      updates.players = updatedPlayers
     }
 
     // Check end game condition (Rule 6)
@@ -528,11 +578,16 @@ export async function issueLiability(gameId: string, userId: string, handIndex: 
 
     if (!card || !('rfr_type' in card)) throw new Error('Not a liability card')
 
+    // Enforce per-turn issue limit based on character
+    const maxLiabilities = getPlayableLiabilities(player.character)
+    if (player.liabilities_issued_this_turn >= maxLiabilities) throw new Error('Already issued maximum liabilities this turn')
+
     // Remove from hand, add to liabilities, gain cash
     const [liability] = hand.splice(handIndex, 1)
     player.hand = hand
-    player.liabilities = [...player.liabilities, liability as unknown as import('../types/game').Liability]
+    player.liabilities = [...player.liabilities, liability as unknown as Liability]
     player.cash += (liability as { gold: number }).gold
+    player.liabilities_issued_this_turn += 1
 
     const players = [...state.players]
     players[playerIndex] = player
@@ -561,6 +616,8 @@ export async function endTurn(gameId: string, userId: string): Promise<void> {
       has_used_ability: false,
       cards_drawn: [] as number[],
       total_cards_drawn: 0,
+      assets_bought_this_turn: 0,
+      liabilities_issued_this_turn: 0,
     }))
 
     // Find next player (skip fired characters)
@@ -580,10 +637,15 @@ export async function endTurn(gameId: string, userId: string): Promise<void> {
 
     // Check if game should end (final round completed)
     if (state.is_final_round && isNewRound) {
+      // Check if any player has purple assets with abilities
+      const hasPurpleAbilities = players.some(p =>
+        p.assets.some(a => a.color === 'purple' && a.ability)
+      )
       transaction.update(gameRef, {
         players,
-        phase: 'results',
-        current_player_index: null,
+        phase: hasPurpleAbilities ? 'asset_abilities' : 'results',
+        current_player_index: hasPurpleAbilities ? 0 : null,
+        _assetAbilityPlayerIndex: hasPurpleAbilities ? 0 : null,
       })
       return
     }
@@ -644,5 +706,132 @@ export async function fireCharacter(gameId: string, userId: string, targetPlayer
     const firedChars = [...(state._firedCharacters || []), target.character!]
 
     transaction.update(gameRef, { players, _firedCharacters: firedChars })
+  })
+}
+
+// Purple asset ability: minus_into_plus — flip a market minus to plus for one color
+export async function useMinusIntoPlus(gameId: string, userId: string, assetIndex: number, color: import('../types/game').CardColor): Promise<void> {
+  const gameRef = doc(db, 'games', gameId)
+
+  await runTransaction(db, async (transaction) => {
+    const snapshot = await transaction.get(gameRef)
+    if (!snapshot.exists()) throw new Error('Game not found')
+
+    const state = snapshot.data() as GameState
+    if (state.phase !== 'asset_abilities') throw new Error('Not in asset abilities phase')
+
+    const playerIndex = state.players.findIndex(p => p.user_id === userId)
+    const player = state.players[playerIndex]
+    const asset = player.assets[assetIndex]
+    if (!asset || asset.ability !== 'minus_into_plus') throw new Error('Invalid asset ability')
+    if (state.market[color] !== 'minus') throw new Error('Color is not minus')
+
+    const newMarket = { ...state.market, [color]: 'plus' as const }
+    const assets = [...player.assets]
+    assets[assetIndex] = { ...asset, ability: undefined }
+
+    const players = state.players.map((p, i) =>
+      i === playerIndex ? { ...p, assets } : p
+    )
+
+    transaction.update(gameRef, { players, market: newMarket })
+  })
+}
+
+// Purple asset ability: silver_into_gold — convert silver value to gold on one asset
+export async function useSilverIntoGold(gameId: string, userId: string, purpleAssetIndex: number, targetAssetIndex: number): Promise<void> {
+  const gameRef = doc(db, 'games', gameId)
+
+  await runTransaction(db, async (transaction) => {
+    const snapshot = await transaction.get(gameRef)
+    if (!snapshot.exists()) throw new Error('Game not found')
+
+    const state = snapshot.data() as GameState
+    if (state.phase !== 'asset_abilities') throw new Error('Not in asset abilities phase')
+
+    const playerIndex = state.players.findIndex(p => p.user_id === userId)
+    const player = state.players[playerIndex]
+    const purpleAsset = player.assets[purpleAssetIndex]
+    if (!purpleAsset || purpleAsset.ability !== 'silver_into_gold') throw new Error('Invalid asset ability')
+
+    const targetAsset = player.assets[targetAssetIndex]
+    if (!targetAsset) throw new Error('Target asset not found')
+
+    const assets = [...player.assets]
+    assets[targetAssetIndex] = { ...targetAsset, gold: targetAsset.gold + targetAsset.silver, silver: 0 }
+    assets[purpleAssetIndex] = { ...purpleAsset, ability: undefined }
+
+    const players = state.players.map((p, i) =>
+      i === playerIndex ? { ...p, assets } : p
+    )
+
+    transaction.update(gameRef, { players })
+  })
+}
+
+// Purple asset ability: change_asset_color — change the color of one of your assets
+export async function useChangeAssetColor(gameId: string, userId: string, purpleAssetIndex: number, targetAssetIndex: number, newColor: import('../types/game').CardColor): Promise<void> {
+  const gameRef = doc(db, 'games', gameId)
+
+  await runTransaction(db, async (transaction) => {
+    const snapshot = await transaction.get(gameRef)
+    if (!snapshot.exists()) throw new Error('Game not found')
+
+    const state = snapshot.data() as GameState
+    if (state.phase !== 'asset_abilities') throw new Error('Not in asset abilities phase')
+
+    const playerIndex = state.players.findIndex(p => p.user_id === userId)
+    const player = state.players[playerIndex]
+    const purpleAsset = player.assets[purpleAssetIndex]
+    if (!purpleAsset || purpleAsset.ability !== 'change_asset_color') throw new Error('Invalid asset ability')
+
+    const targetAsset = player.assets[targetAssetIndex]
+    if (!targetAsset) throw new Error('Target asset not found')
+
+    const assets = [...player.assets]
+    assets[targetAssetIndex] = { ...targetAsset, color: newColor }
+    assets[purpleAssetIndex] = { ...purpleAsset, ability: undefined }
+
+    const players = state.players.map((p, i) =>
+      i === playerIndex ? { ...p, assets } : p
+    )
+
+    transaction.update(gameRef, { players })
+  })
+}
+
+// Done using purple asset abilities, advance to next player or results
+export async function confirmAssetAbilities(gameId: string, userId: string): Promise<void> {
+  const gameRef = doc(db, 'games', gameId)
+
+  await runTransaction(db, async (transaction) => {
+    const snapshot = await transaction.get(gameRef)
+    if (!snapshot.exists()) throw new Error('Game not found')
+
+    const state = snapshot.data() as GameState
+    if (state.phase !== 'asset_abilities') throw new Error('Not in asset abilities phase')
+
+    const playerIndex = state.players.findIndex(p => p.user_id === userId)
+    if (playerIndex === -1) throw new Error('Player not found')
+
+    // Find next player who has purple assets with abilities
+    let nextIndex = playerIndex + 1
+    while (nextIndex < state.players.length) {
+      const p = state.players[nextIndex]
+      if (p.assets.some(a => a.color === 'purple' && a.ability)) break
+      nextIndex++
+    }
+
+    if (nextIndex >= state.players.length) {
+      // All done, go to results
+      transaction.update(gameRef, {
+        phase: 'results',
+        current_player_index: null,
+      })
+    } else {
+      transaction.update(gameRef, {
+        current_player_index: nextIndex,
+      })
+    }
   })
 }

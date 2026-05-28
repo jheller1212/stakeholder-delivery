@@ -79,7 +79,7 @@ export const CHARACTER_INFO: Record<Character, { name: string; abilities: string
 export type AssetAbility = 'minus_into_plus' | 'silver_into_gold' | 'change_asset_color'
 
 // Game phases
-export type GamePhase = 'lobby' | 'character_selection' | 'drawing' | 'playing' | 'banker_target' | 'results'
+export type GamePhase = 'lobby' | 'character_selection' | 'drawing' | 'playing' | 'banker_target' | 'asset_abilities' | 'results'
 
 export interface Player {
   id: string
@@ -93,6 +93,8 @@ export interface Player {
   has_used_ability: boolean
   cards_drawn: number[]
   total_cards_drawn: number
+  assets_bought_this_turn: number
+  liabilities_issued_this_turn: number
   is_connected: boolean
 }
 
