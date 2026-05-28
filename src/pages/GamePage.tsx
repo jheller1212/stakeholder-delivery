@@ -173,6 +173,7 @@ export default function GamePage() {
             player={currentPlayer}
             isMyTurn={isMyTurn}
             market={state.market}
+            state={state}
             onDrawCard={(type) => drawCard(gameId!, user!.uid, type).catch(handleError)}
             onPutBackCard={(index) => putBackCard(gameId!, user!.uid, index).catch(handleError)}
           />
